@@ -321,30 +321,59 @@ def indikatoren_bauen(kurse, gruppen):
             "these": "gut" if (strom - ndx) < -2 else "neutral",
         })
 
-    # --- China-Gegenprobe
-    china = gruppe_schnitt("China und Gegenseite", "monat_prozent")
+    # --- China-Gegenprobe ueber die Plattformen
+    china = gruppe_schnitt("China Internet und Cloud", "monat_prozent")
     if china is not None and ndx is not None:
         rs = china - ndx
         ind.append({
             "name": "China-Relativstaerke",
             "wert": rs,
             "einheit": "%-Pkt vs Nasdaq (1 Monat)",
-            "erklaerung": "Die eigentliche Gegenprobe der These: Gewinnt China den "
-                          "KI-Wettlauf, sollten Alibaba, Baidu und SMIC den US-Werten "
-                          "davonlaufen.",
+            "erklaerung": "Alibaba und Baidu gegen den Nasdaq. Als "
+                          "US-Hinterlegungsscheine bilden sie allerdings auch "
+                          "amerikanische Stimmung ab - deshalb steht daneben die "
+                          "Chipfertigung als schaerfere Probe.",
             "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
         })
 
-    # --- Kreditumfeld
+    # --- China-Gegenprobe ueber die Fertigung
+    chipfert = gruppe_schnitt("China Chipfertigung", "monat_prozent")
+    if chipfert is not None and ndx is not None:
+        rs = chipfert - ndx
+        ind.append({
+            "name": "China-Chipfertigung",
+            "wert": rs,
+            "einheit": "%-Pkt vs Nasdaq (1 Monat)",
+            "erklaerung": "SMIC, Cambricon und Hua Hong an ihren Heimatboersen. "
+                          "Hier zeigt sich, ob Chinas eigene Hardware wirklich "
+                          "vorankommt - der Kern der These, den die "
+                          "Plattformwerte nicht abbilden.",
+            "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
+        })
+
+    # --- Kreditrisiko sauber isoliert
     hyg = wert("HYG", "monat_prozent")
-    if hyg is not None:
+    lqd = wert("LQD", "monat_prozent")
+    if hyg is not None and lqd is not None:
+        aufschlag = hyg - lqd
+        ind.append({
+            "name": "Kreditrisiko-Aufschlag",
+            "wert": aufschlag,
+            "einheit": "%-Pkt, Hochzins gegen erste Bonitaet (1 Monat)",
+            "erklaerung": "Hochzinsanleihen gegen Anleihen erster Bonitaet. Die "
+                          "Differenz trennt echtes Ausfallrisiko von blossen "
+                          "Zinsbewegungen, die beide gleich treffen. Faellt sie, "
+                          "wird die Refinanzierung der schuldenfinanzierten "
+                          "Neoclouds teurer - ihr wunder Punkt.",
+            "these": "gut" if aufschlag < -1 else "neutral",
+        })
+    elif hyg is not None:
         ind.append({
             "name": "Hochzins-Kredite (HYG)",
             "wert": hyg,
             "einheit": "% (1 Monat)",
             "erklaerung": "Die Neoclouds finanzieren GPUs mit Fremdkapital. Faellt "
-                          "HYG, wird ihre Refinanzierung teurer - der wunde Punkt "
-                          "des Geschaeftsmodells.",
+                          "HYG, wird ihre Refinanzierung teurer.",
             "these": "gut" if hyg < -1 else "neutral",
         })
 
@@ -376,8 +405,10 @@ def barometer_rechnen(indikatoren, nachrichten):
         "Bau-Relativstaerke": 1.5,
         "Chips gegen Hyperscaler": 1.2,
         "Konzentrations-Spread": 1.0,
-        "China-Relativstaerke": 0.8,
+        "China-Relativstaerke": 0.5,
+        "China-Chipfertigung": 1.0,
         "Strom-Relativstaerke": 0.8,
+        "Kreditrisiko-Aufschlag": 1.0,
         "Hochzins-Kredite (HYG)": 0.7,
     }
 
@@ -386,7 +417,7 @@ def barometer_rechnen(indikatoren, nachrichten):
         if gewicht is None:
             continue
         roh = ind["wert"]
-        if ind["name"] == "China-Relativstaerke":
+        if ind["name"] in ("China-Relativstaerke", "China-Chipfertigung"):
             roh = -roh          # dort ist Staerke gut fuer die These
         # -10 bis +10 Prozentpunkte auf -1..+1 abbilden, Vorzeichen drehen
         normiert = max(-1.0, min(1.0, -roh / 10.0))

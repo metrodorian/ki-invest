@@ -60,10 +60,10 @@ Schalter:
 **Positionen** — Kurs, Tagesbewegung, geschätzte Schein-Bewegung, Abstand zur
 Knock-Out-Barriere, aufgelaufener Volatilitäts-Drag.
 
-**Sieben Marktgruppen** — Chips, Neoclouds, Hyperscaler, Rechenzentrums-Bau,
-Strom, China-Gegenseite, Marktbreite und Stress.
+**Acht Marktgruppen** — Chips, Neoclouds, Hyperscaler, Rechenzentrums-Bau, Strom,
+China-Plattformen, China-Chipfertigung, Marktbreite und Stress.
 
-**Neun abgeleitete Indikatoren**, die einzelne Kurse nicht zeigen:
+**Zehn abgeleitete Indikatoren**, die einzelne Kurse nicht zeigen:
 
 | Indikator | Wozu |
 |---|---|
@@ -73,8 +73,9 @@ Strom, China-Gegenseite, Marktbreite und Stress.
 | Chips gegen Hyperscaler | wo der Markt das Risiko verortet |
 | Bau-Relativstärke | die Seite, auf der die Vertiv-Position sitzt |
 | Strom-Relativstärke | Engpassfaktor 2026 |
-| China-Relativstärke | die eigentliche Gegenprobe der These |
-| Hochzins-Kredite | Refinanzierungsdruck bei den Neoclouds |
+| China-Relativstärke | Alibaba und Baidu, aber als ADR von US-Stimmung gefärbt |
+| China-Chipfertigung | SMIC, Cambricon, Hua Hong an den Heimatbörsen — die schärfere Gegenprobe |
+| Kreditrisiko-Aufschlag | Hochzins gegen erste Bonität, trennt Ausfallrisiko von Zinsbewegung |
 | Speicherpreise | Kostenseite der Capex-Rendite |
 
 **Barometer 0–100** — verdichtet Relativstärken, Volatilitätsstruktur,
@@ -84,11 +85,15 @@ Short-These.
 **Nachrichten** aus fünf Quellen:
 
 - Yahoo-Finance-Schlagzeilen je Ticker
-- acht thematische Google-News-Suchen (Capex-Signale, Stornierungen, Blasen-Debatte,
-  China-KI, Exportkontrollen, Zirkelfinanzierung, Strom, GPU-Preise)
+- dreizehn thematische Google-News-Suchen (Capex-Signale, Stornierungen,
+  Blasen-Debatte, China-KI, Exportkontrollen, Zirkelfinanzierung, Strom,
+  GPU-Mietpreise, Speicher-Vertragspreise, Netzanschluss-Warteschlange,
+  Schulden der KI-Bauherren, Auftragseingang der Ausrüster)
 - Federal Register — Regierungsvorhaben zu Exportkontrollen und Chips
 - SEC EDGAR — 8-K-Pflichtmeldungen von Nvidia, Vertiv, CoreWeave
-- Blogs von OpenAI, DeepMind, HuggingFace und DataCenterDynamics
+- Blogs von OpenAI, DeepMind, HuggingFace, DataCenterDynamics, SemiAnalysis
+  (veröffentlicht den GPU-Mietpreisindex), Utility Dive (Netzanschlüsse und
+  Versorger) und The Register
 
 Effizienzdurchbrüche bei Modellen zählen dabei **für** die These, auch wenn sie
 positiv klingen — der DeepSeek-Moment begann mit einer Modellveröffentlichung,

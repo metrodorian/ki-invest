@@ -43,7 +43,7 @@
       "rolle": "Erste Reihe. Reagiert am staerksten auf Effizienzschocks (DeepSeek: -16,9%)."
     },
     "Neoclouds": {
-      "ticker": ["CRWV", "NBIS", "IREN", "APLD"],
+      "ticker": ["CRWV", "NBIS", "IREN", "APLD", "CIFR", "WULF"],
       "rolle": "Frueherkennung. Schuldenfinanziert, bricht als Erstes bei Refinanzierungsstress."
     },
     "Hyperscaler": {
@@ -58,12 +58,16 @@
       "ticker": ["CEG", "VST", "TLN", "BE", "GEV"],
       "rolle": "Engpassfaktor 2026. Bricht mit, wenn Projekte storniert werden."
     },
-    "China und Gegenseite": {
-      "ticker": ["BABA", "BIDU", "0981.HK"],
-      "rolle": "Gegenprobe: Gewinnt China, sollten diese Werte relative Staerke zeigen."
+    "China Internet und Cloud": {
+      "ticker": ["BABA", "BIDU"],
+      "rolle": "Gegenprobe ueber die Plattformen. Achtung: als US-Hinterlegungsscheine gehandelt und daher stark von amerikanischer Stimmung gefaerbt."
+    },
+    "China Chipfertigung": {
+      "ticker": ["0981.HK", "688981.SS", "688256.SS", "1347.HK"],
+      "rolle": "Die eigentliche Gegenprobe: SMIC in Hongkong und Schanghai, Cambricon, Hua Hong. Kaeme Chinas guenstigere Hardware wirklich voran, muesste es sich hier zeigen."
     },
     "Markt und Stress": {
-      "ticker": ["^GSPC", "^NDX", "RSP", "^VIX", "^VIX3M", "HYG"],
+      "ticker": ["^GSPC", "^NDX", "RSP", "^VIX", "^VIX3M", "HYG", "LQD", "JNK"],
       "rolle": "Breite, Konzentration und Kreditstress im Gesamtmarkt."
     }
   },
@@ -78,14 +82,21 @@
     { "thema": "Chip-Exportkontrolle", "query": "Nvidia China export controls chip restrictions" },
     { "thema": "Zirkelfinanzierung",   "query": "Nvidia invests customer vendor financing circular" },
     { "thema": "Rechenzentrums-Strom", "query": "data center power grid moratorium utility" },
-    { "thema": "GPU-Preise",           "query": "GPU rental prices H100 falling oversupply" }
+    { "thema": "GPU-Mietpreise",       "query": "GPU rental price index H100 hourly falling oversupply" },
+    { "thema": "Speicher-Vertragspreise", "query": "DRAM HBM contract price TrendForce increase" },
+    { "thema": "Netzanschluss-Warteschlange", "query": "ERCOT large load interconnection queue data center approval" },
+    { "thema": "Schulden der KI-Bauherren", "query": "CoreWeave OR Oracle bond yield spread AI debt financing" },
+    { "thema": "Auftragseingang Ausruestung", "query": "Vertiv OR \"Comfort Systems\" orders backlog book-to-bill data center" }
   ],
 
   "blogs": [
     { "quelle": "OpenAI",       "url": "https://openai.com/blog/rss.xml" },
     { "quelle": "DeepMind",     "url": "https://deepmind.google/blog/rss.xml" },
     { "quelle": "HuggingFace",  "url": "https://huggingface.co/blog/feed.xml" },
-    { "quelle": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/rss/" }
+    { "quelle": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/rss/" },
+    { "quelle": "SemiAnalysis", "url": "https://semianalysis.com/feed/" },
+    { "quelle": "Utility Dive", "url": "https://www.utilitydive.com/feeds/news/" },
+    { "quelle": "The Register KI", "url": "https://www.theregister.com/software/ai_ml/headlines.atom" }
   ],
 
   "sec_firmen": [
