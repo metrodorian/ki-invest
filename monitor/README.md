@@ -49,7 +49,11 @@ Schalter:
 - `--watch` — nur prüfen und warnen (Voreinstellung)
 - `--report` — Bericht bauen und im Browser öffnen
 - `--test` — Bericht bauen, aber nicht öffnen
-- `--ohne-claude` — die Einordnung durch Claude überspringen
+- `--nur-claude` — **nur** die Einordnung neu anfragen und den Bericht damit neu
+  bauen. Nutzt die zuletzt gesammelten Daten aus `daten.json`, ruft also weder
+  Kurse noch Nachrichten erneut ab. Dauert rund zwei Minuten statt der vollen
+  Sammelzeit — praktisch, wenn nur der Text nicht überzeugt.
+- `--ohne-claude` — die Einordnung überspringen
 
 ## Was beobachtet wird
 
@@ -97,9 +101,25 @@ heute besonders war. Diese Zusammenfassung wird immer aus den Messwerten erzeugt
 und funktioniert ohne Netz und ohne Sprachmodell.
 
 Zusätzlich wird `claude -p` aufgerufen und schreibt eine eigene Einordnung, die
-dann darüber steht. Der Aufruf läuft mit `--allowedTools ""`, kann also keine
-Werkzeuge benutzen und keine Rückfrage auslösen — er eignet sich für
-unbeaufsichtigte Läufe.
+dann darüber steht.
+
+### Arbeitsteilung
+
+Das **Skript** deckt die feste Grundversorgung ab: immer dieselben Ticker, Feeds
+und Suchbegriffe, damit Verläufe über die Wochen vergleichbar bleiben. **Claude**
+ergänzt anlassbezogen — es darf selbst im Netz suchen, wenn eine Zahl
+erklärungsbedürftig ist oder eine Vermutung belegt werden soll, und es darf
+fehlende Daten anfordern.
+
+Beides bleibt im Bericht getrennt: gemessene Werte im grauen Block, Claudes
+Recherche in einem eigenen Abschnitt mit gestricheltem Rahmen und dem Hinweis,
+dass die Befunde ungeprüft sind. Die Datenwünsche landen unter „Was Claude
+fehlt" und lassen sich direkt in die `config.json` übernehmen.
+
+Erlaubt sind ausschließlich `WebSearch` und `WebFetch` — Dateizugriff und Shell
+bleiben gesperrt. Damit kann keine Rückfrage nach Berechtigungen auftauchen, der
+Lauf bleibt unbeaufsichtigt. Über `"werkzeuge"` im Abschnitt `claude` der
+`config.json` lässt sich das ändern, `""` schaltet die Suche ganz ab.
 
 **Vor dem ersten Lauf einmal anmelden:**
 

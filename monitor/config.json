@@ -123,8 +123,8 @@
   "claude": {
     "aktiv": true,
     "befehl": "claude",
-    "zeitlimit_sekunden": 180,
-    "modell": null
+    "zeitlimit_sekunden": 420,
+    "modell": "opus"
   },
 
   "termine": [

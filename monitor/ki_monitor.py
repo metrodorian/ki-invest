@@ -40,6 +40,7 @@ from statistics import pstdev, mean
 BASIS = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PFAD = os.path.join(BASIS, "config.json")
 STATE_PFAD = os.path.join(BASIS, "state.json")
+DATEN_PFAD = os.path.join(BASIS, "daten.json")
 BERICHT_PFAD = os.path.join(BASIS, "bericht.html")
 LOG_PFAD = os.path.join(BASIS, "monitor.log")
 
@@ -736,16 +737,37 @@ Nachrichten, Effizienzdurchbrueche bei Modellen (die stuetzen die These, auch we
 sie positiv klingen), und Zirkelfinanzierung (Chiphersteller finanzieren ihre
 eigenen Kunden - das schwaecht die Umsatzqualitaet).
 
-Schreibe die Zusammenfassung in gutem, klarem Deutsch: kurze Hauptsaetze, keine
-Aufzaehlungsfloskeln, kein Fettdruck, keine Anglizismen wo ein deutsches Wort passt.
-Sie soll erklaeren, was der Bericht bedeutet und was heute besonders war - so, dass
-man nach drei Saetzen Bescheid weiss.
+EIGENE RECHERCHE
+Dir steht die Websuche zur Verfuegung. Nutze sie, wenn eine Schlagzeile ohne
+Zusammenhang unklar bleibt, wenn du eine Vermutung belegen oder widerlegen willst,
+oder wenn eine Zahl im Bericht nach einer Erklaerung verlangt. Ein bis drei gezielte
+Suchen sind sinnvoll, mehr selten. Trage jeden Befund im Feld "recherche" ein - er
+bekommt im Bericht einen eigenen Abschnitt und ist dort als deine eigene Recherche
+gekennzeichnet, getrennt von den gemessenen Daten. Schreibe dort auch hin, wenn eine
+Suche deine Vermutung NICHT bestaetigt hat; auch das ist ein Ergebnis.
+
+FEHLENDE DATEN
+Wenn dir etwas fehlt, um die Lage sauber zu beurteilen - eine Kennzahl, ein Ticker,
+eine Quelle, ein Zeitraum -, dann sag es im Feld "datenwunsch". Der Nutzer kann den
+Monitor entsprechend erweitern. Formuliere konkret, also nicht "mehr Daten zu China",
+sondern etwa "Kurs von SMIC in Hongkong (0981.HK) als Wochenveraenderung".
+
+STIL
+Gutes, klares Deutsch: kurze Hauptsaetze, keine Aufzaehlungsfloskeln, kein Fettdruck,
+keine Anglizismen wo ein deutsches Wort passt. Die Zusammenfassung soll erklaeren,
+was der Bericht bedeutet und was heute besonders war - so, dass man nach drei Saetzen
+Bescheid weiss.
 
 Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
 {"zusammenfassung": ["Satz 1", "Satz 2", "Satz 3"],
  "these_status": "bestaetigt|neutral|gefaehrdet",
  "wichtigste_punkte": ["Punkt 1", "Punkt 2", "Punkt 3"],
  "uebersehen": "Was der Stichwortfilter falsch eingeordnet hat, oder leer",
+ "recherche": [{"frage": "Was wolltest du wissen",
+                "befund": "Was die Suche ergab, auch wenn sie nichts belegt",
+                "folgerung": "Was das fuer die These bedeutet",
+                "quelle": "Kurzname oder URL"}],
+ "datenwunsch": ["Konkret benannte Kennzahl oder Quelle, die dir fehlt"],
  "handlungsbedarf": "keiner|beobachten|dringend",
  "begruendung": "1-2 Saetze, warum dieser Handlungsbedarf"}
 """ % (
@@ -768,9 +790,11 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(sec, 8, lambda s: "  %s: %s" % (s.get("firma", ""), s["titel"][:120])),
     )
 
-    # --allowedTools "" schaltet jede Werkzeugnutzung ab. Damit kann keine
-    # Rueckfrage nach Berechtigungen auftauchen - der Lauf bleibt unbeaufsichtigt.
-    aufruf = [befehl_name, "-p", prompt, "--allowedTools", ""]
+    # Nur Websuche und Seitenabruf sind erlaubt und damit vorab genehmigt.
+    # Alles andere - Dateien, Shell - bleibt gesperrt, es kann also keine
+    # Rueckfrage nach Berechtigungen auftauchen und der Lauf bleibt unbeaufsichtigt.
+    werkzeuge = einst.get("werkzeuge", "WebSearch WebFetch")
+    aufruf = [befehl_name, "-p", prompt, "--allowedTools", werkzeuge]
     if einst.get("modell"):
         aufruf += ["--model", einst["modell"]]
 
@@ -962,6 +986,22 @@ def sparkline(werte, breite=110, hoehe=26):
             % (breite, hoehe, breite, hoehe, " ".join(punkte), farbe))
 
 
+def barometer_verlauf_balken(verlauf):
+    """Balkenreihe der letzten Barometer-Staende. Der Trend sagt mehr als der Stand."""
+    if not verlauf or len(verlauf) < 2:
+        return ""
+    balken = []
+    for i, eintrag in enumerate(verlauf[-24:]):
+        wert = eintrag.get("wert", 50)
+        hoehe = max(3, int(round(wert / 100.0 * 30)))
+        klasse = "hoch" if wert >= 56 else ("tief" if wert <= 44 else "")
+        if i == len(verlauf[-24:]) - 1:
+            klasse += " jetzt"
+        balken.append('<i class="%s" style="height:%dpx" title="%s: %d"></i>'
+                      % (klasse.strip(), hoehe, eintrag.get("datum", ""), wert))
+    return '<div class="verlauf">%s</div>' % "".join(balken)
+
+
 def klasse_fuer(wert, invertiert=False):
     if wert is None:
         return "neutral"
@@ -1054,12 +1094,34 @@ ul.liste li:last-child{border-bottom:none}
  padding-top:11px;margin:13px 0 10px;font-weight:600}
 .fazit p.gemessen{font-size:14px;color:var(--gedaempft);line-height:1.55}
 .fazit p.gemessen b{color:var(--text);font-weight:600}
+.warnfeld{background:var(--flaeche2);border:1px dashed var(--warn);
+ border-radius:10px;padding:11px 15px;margin-bottom:10px;font-size:12.5px;
+ color:var(--gedaempft);line-height:1.5}
+.karte.recherche{border-left:4px solid var(--warn);background:var(--flaeche)}
+.karte.recherche .frage{font-weight:600;font-size:13px;color:var(--warn)}
+.tabelle{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px}
+.tabelle table{min-width:640px}
+.neu{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;
+ text-transform:uppercase;background:var(--akzent);color:#fff;border-radius:3px;
+ padding:1px 5px;margin-right:6px;vertical-align:1px}
+.verlauf{display:flex;align-items:flex-end;gap:2px;height:30px;margin-top:2px}
+.verlauf i{width:5px;border-radius:1px;background:var(--rand);display:block}
+.verlauf i.hoch{background:var(--gut)}
+.verlauf i.tief{background:var(--schlecht)}
+.verlauf i.jetzt{outline:1.5px solid var(--text);outline-offset:1px}
+@media(max-width:640px){
+ body{padding:18px 12px 50px}
+ .baro{flex-wrap:wrap;gap:12px}
+ .baro .wert{font-size:34px}
+ .gitter{grid-template-columns:1fr}
+}
 """
 
 
 def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                   barometer, nachrichten, regierung, blogs, sec, alarme,
-                  claude_urteil, fehler, zusammenfassung=None):
+                  claude_urteil, fehler, zusammenfassung=None,
+                  barometer_verlauf=None):
     jetzt = datetime.now()
     heute = date.today()
     t = []
@@ -1083,14 +1145,23 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
 
     # ---- Barometer
     wert, lage = barometer
+    balken = barometer_verlauf_balken(barometer_verlauf)
+    trend = ""
+    if barometer_verlauf and len(barometer_verlauf) >= 2:
+        vorher = barometer_verlauf[-2].get("wert")
+        if vorher is not None and vorher != wert:
+            trend = ' <span class="klein">(zuvor %d)</span>' % vorher
     t.append('<div class="baro"><div class="wert %s">%d</div><div class="rest">'
-             '<div style="font-weight:600">%s</div>'
+             '<div style="font-weight:600">%s%s</div>'
              '<div class="skala"><i style="left:calc(%d%% - 1px)"></i></div>'
              '<div class="klein">0 = Umfeld arbeitet gegen die Short-These, '
              '100 = dafuer. Verdichtet Relativstaerken, Volatilitaetsstruktur, '
-             'Kreditumfeld und die Nachrichtenbilanz.</div></div></div>'
+             'Kreditumfeld und die Nachrichtenbilanz.</div></div>%s</div>'
              % ("gut" if wert >= 56 else ("schlecht" if wert <= 44 else "neutral"),
-                wert, lage, wert))
+                wert, lage, trend, wert,
+                ('<div style="text-align:right"><div class="klein" '
+                 'style="margin-bottom:3px">Verlauf</div>%s</div>' % balken)
+                if balken else ""))
 
     # ---- Zusammenfassung in Worten
     claude_saetze = []
@@ -1142,6 +1213,50 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                          % html_schuetzen(claude_urteil["begruendung"]))
             t.append("</div>")
 
+        # ---- Eigene Recherche und Datenwuensche
+        recherche = (claude_urteil.get("recherche") or []
+                     if not claude_urteil.get("fehler") else [])
+        wuensche = (claude_urteil.get("datenwunsch") or []
+                    if not claude_urteil.get("fehler") else [])
+
+        if recherche:
+            t.append("<h2>Eigene Recherche von Claude</h2>")
+            t.append('<div class="warnfeld">Dieser Abschnitt stammt <b>nicht</b> aus '
+                     'den ueberwachten Quellen. Claude hat hier auf eigene Faust im '
+                     'Netz gesucht, um eine Vermutung zu pruefen. Die Befunde sind '
+                     'ungeprueft und koennen falsch sein &ndash; behandle sie als '
+                     'Anhaltspunkt, nicht als Messwert.</div>')
+            for r in recherche:
+                if not isinstance(r, dict):
+                    t.append('<div class="karte recherche">%s</div>' % html_schuetzen(r))
+                    continue
+                t.append('<div class="karte recherche">'
+                         '<div class="frage">%s</div>'
+                         '<div style="margin:7px 0">%s</div>' % (
+                             html_schuetzen(r.get("frage", "")),
+                             html_schuetzen(r.get("befund", ""))))
+                if r.get("folgerung"):
+                    t.append('<div class="klein"><b>Folgerung:</b> %s</div>'
+                             % html_schuetzen(r["folgerung"]))
+                if r.get("quelle"):
+                    quelle = str(r["quelle"])
+                    if quelle.startswith("http"):
+                        t.append('<div class="klein">Quelle: <a href="%s">%s</a></div>'
+                                 % (html_schuetzen(quelle), html_schuetzen(quelle[:90])))
+                    else:
+                        t.append('<div class="klein">Quelle: %s</div>'
+                                 % html_schuetzen(quelle))
+                t.append("</div>")
+
+        if wuensche:
+            t.append("<h2>Was Claude fehlt</h2>")
+            t.append('<div class="klein" style="margin-bottom:8px">Vorschlaege zur '
+                     'Erweiterung des Monitors &ndash; umsetzbar in '
+                     '<code>config.json</code>.</div><ul class="liste">')
+            for w in wuensche:
+                t.append("<li>%s</li>" % html_schuetzen(w))
+            t.append("</ul>")
+
     # ---- Auffaelligkeiten
     t.append("<h2>Auffaelligkeiten</h2>")
     echte = [a for a in alarme if a[0] == "alarm"]
@@ -1159,7 +1274,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append("</details>")
 
     # ---- Positionen
-    t.append("<h2>Positionen</h2><table><tr><th>Position</th><th>WKN</th>"
+    t.append("<h2>Positionen</h2><div class='tabelle'><table><tr><th>Position</th><th>WKN</th>"
              "<th>Verlauf 3 Monate</th><th class='z'>Kurs</th><th class='z'>Tag</th>"
              "<th class='z'>Schein Tag</th><th class='z'>seit Einstieg</th>"
              "<th class='z'>Puffer</th><th class='z'>Drag</th></tr>")
@@ -1181,7 +1296,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      zahl(p.get("schein_seit_einstieg"), 1, "%"),
                      pk, ("%.1f%%" % puffer) if puffer is not None else "&ndash;",
                      zahl(p.get("drag_prozent"), 1, "%")))
-    t.append("</table>")
+    t.append("</table></div>")
     t.append('<div class="klein" style="margin-top:8px">Schein-Werte sind '
              'Naeherungen (Basiswert-Bewegung mal Faktor, ohne Produktkosten). '
              'Die Reset-Barriere wandert taeglich &ndash; Stand laut Konfiguration: '
@@ -1189,6 +1304,24 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              'Spalten "seit Einstieg" und "Drag" rechnen.</div>'
              % ", ".join("%s&nbsp;%s" % (p.get("wkn", ""), p.get("barriere_stand", "?"))
                          for p in positionen))
+
+    # Veraltete Barrieren sind gefaehrlich: der angezeigte Puffer stimmt dann nicht.
+    veraltet = []
+    for p in positionen:
+        try:
+            stand = datetime.strptime(p.get("barriere_stand", ""), "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        alter = (heute - stand).days
+        if alter > 5:
+            veraltet.append("%s (%d Tage)" % (p.get("wkn", ""), alter))
+    if veraltet:
+        t.append('<div class="karte hinweis klein" style="margin-top:8px">'
+                 'Die hinterlegte Reset-Barriere ist veraltet: %s. Sie wandert '
+                 'taeglich mit, der oben gezeigte Puffer ist daher zu optimistisch '
+                 'oder zu pessimistisch. Aktuellen Wert im ING-Depot oder auf '
+                 'onvista ablesen und in <code>config.json</code> eintragen.</div>'
+                 % ", ".join(veraltet))
 
     # ---- Indikatoren
     t.append("<h2>Abgeleitete Indikatoren</h2><div class='gitter'>")
@@ -1212,7 +1345,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append("<h3>%s</h3>" % gruppe)
         if info.get("rolle"):
             t.append('<div class="klein" style="margin-bottom:7px">%s</div>' % info["rolle"])
-        t.append("<table><tr><th>Ticker</th><th>Verlauf</th><th class='z'>Kurs</th>"
+        t.append("<div class='tabelle'><table><tr><th>Ticker</th><th>Verlauf</th><th class='z'>Kurs</th>"
                  "<th class='z'>Tag</th><th class='z'>Woche</th><th class='z'>Monat</th>"
                  "<th class='z'>Quartal</th><th class='z'>vom Hoch</th>"
                  "<th class='z'>Vola</th><th class='z'>Z</th></tr>")
@@ -1234,7 +1367,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                          ("%.0f%%" % w["abstand_hoch"]) if w.get("abstand_hoch") is not None else "&ndash;",
                          w["sigma_jahr"],
                          "schlecht" if abs(w["z_wert"]) >= 2.5 else "neutral", w["z_wert"]))
-        t.append("</table>")
+        t.append("</table></div>")
 
     # ---- Nachrichten
     t.append("<h2>Nachrichten mit Bezug zur These</h2>")
@@ -1242,10 +1375,26 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     if not relevant:
         t.append('<div class="karte klein">Keine Schlagzeile mit passenden '
                  'Stichworten gefunden.</div>')
+    neue_anzahl = sum(1 for n in relevant if n.get("neu"))
+    if neue_anzahl:
+        t.append('<div class="klein" style="margin-bottom:8px"><span class="neu">neu</span>'
+                 ' kennzeichnet die %d Meldungen, die seit dem letzten Bericht '
+                 'dazugekommen sind.</div>' % neue_anzahl)
+    relevant.sort(key=lambda n: (not n.get("neu"), n["kategorie"] != "these_gefaehrdet"))
     for n in relevant[:30]:
         stufe = "alarm" if n["kategorie"] == "these_gefaehrdet" else "hinweis"
         richtung = ("spricht <b>gegen</b> die These" if n["kategorie"] == "these_gefaehrdet"
                     else "spricht <b>fuer</b> die These")
+        if n.get("neu"):
+            t.append('<div class="karte %s"><span class="neu">neu</span>'
+                     '<a href="%s">%s</a><div class="klein">' % (
+                         stufe, html_schuetzen(n.get("link", "")),
+                         html_schuetzen(n["titel"])))
+            t.append('%s &middot; %s &middot; %s &middot; Stichworte: %s</div></div>'
+                     % (html_schuetzen(n.get("quelle", "")),
+                        html_schuetzen(n.get("thema", "")), richtung,
+                        html_schuetzen(", ".join(n["treffer"]))))
+            continue
         t.append('<div class="karte %s"><a href="%s">%s</a><div class="klein">'
                  '%s &middot; %s &middot; %s &middot; Stichworte: %s</div></div>'
                  % (stufe, html_schuetzen(n.get("link", "")),
@@ -1431,8 +1580,62 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     }
 
 
+def neuheiten_markieren(nachrichten, zustand):
+    """Kennzeichnet Meldungen, die seit dem letzten Bericht dazugekommen sind."""
+    bekannt = set(zustand.get("gesehene_meldungen", []))
+    aktuell = []
+    for n in nachrichten:
+        schluessel = n["titel"][:110].lower()
+        aktuell.append(schluessel)
+        n["neu"] = bool(bekannt) and schluessel not in bekannt
+    # Nur die letzten Laeufe behalten, damit die Datei nicht waechst
+    zustand["gesehene_meldungen"] = list(dict.fromkeys(
+        aktuell + list(bekannt)))[:800]
+
+
+def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None):
+    html = bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
+                         d["indikatoren"], d["barometer"], d["nachrichten"],
+                         d["regierung"], d["blogs"], d["sec"], d["alarme"],
+                         d.get("claude"), d["fehler"], d.get("zusammenfassung"),
+                         barometer_verlauf)
+    with open(BERICHT_PFAD, "w") as f:
+        f.write(html)
+    if oeffnen:
+        subprocess.run(["open", BERICHT_PFAD], check=False)
+
+
+def nur_claude_neu(konfig, oeffnen):
+    """
+    Fragt allein die Claude-Einordnung neu an und baut den Bericht damit neu.
+    Nutzt die zuletzt gesammelten Daten - kein erneuter Abruf von Kursen,
+    Nachrichten, SEC-Meldungen und Regierungsvorhaben.
+    """
+    d = json_laden(DATEN_PFAD, None)
+    if d is None:
+        log_schreiben("FEHLER: keine gespeicherten Daten. Erst --report oder "
+                      "--test laufen lassen.")
+        return 1
+
+    alter = d.get("gesammelt_am", "unbekannt")
+    d["claude"] = claude_fragen(konfig, d["positionen"], d["indikatoren"],
+                                d["barometer"], d["nachrichten"], d["regierung"],
+                                d["blogs"], d["sec"])
+    zustand = json_laden(STATE_PFAD, {})
+    bericht_schreiben(konfig, d, oeffnen,
+                      zustand.get("barometer_verlauf"))
+
+    if d["claude"] and d["claude"].get("fehler"):
+        log_schreiben("nur-claude: fehlgeschlagen (%s), Daten von %s"
+                      % (d["claude"]["fehler"][:80], alter))
+    else:
+        log_schreiben("nur-claude: neue Einordnung, Daten von %s" % alter)
+    return 0
+
+
 def main():
-    modus = ("report" if "--report" in sys.argv
+    modus = ("nur-claude" if "--nur-claude" in sys.argv
+             else "report" if "--report" in sys.argv
              else "test" if "--test" in sys.argv else "watch")
     mit_claude = "--ohne-claude" not in sys.argv and modus != "watch"
 
@@ -1441,6 +1644,9 @@ def main():
         log_schreiben("FEHLER: config.json nicht lesbar")
         systemmeldung("KI-Invest", "config.json fehlt oder ist fehlerhaft", "Basso")
         return 1
+
+    if modus == "nur-claude":
+        return nur_claude_neu(konfig, oeffnen="--test" not in sys.argv)
 
     zustand = json_laden(STATE_PFAD, {})
 
@@ -1466,14 +1672,19 @@ def main():
                       "%d Abrufprobleme" % (d["barometer"][0], len(d["alarme"]),
                                             len(frisch), len(d["fehler"])))
     else:
-        html = bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
-                             d["indikatoren"], d["barometer"], d["nachrichten"],
-                             d["regierung"], d["blogs"], d["sec"], d["alarme"],
-                             d["claude"], d["fehler"], d["zusammenfassung"])
-        with open(BERICHT_PFAD, "w") as f:
-            f.write(html)
-        if modus == "report":
-            subprocess.run(["open", BERICHT_PFAD], check=False)
+        verlauf = zustand.get("barometer_verlauf", [])
+        verlauf.append({"datum": date.today().strftime("%d.%m."),
+                        "wert": d["barometer"][0]})
+        zustand["barometer_verlauf"] = verlauf[-40:]
+        neuheiten_markieren(d["nachrichten"], zustand)
+        bericht_schreiben(konfig, d, oeffnen=(modus == "report"),
+                          barometer_verlauf=zustand["barometer_verlauf"])
+        # Datenstand sichern, damit --nur-claude ohne erneuten Abruf arbeiten kann
+        d["gesammelt_am"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+        try:
+            json_speichern(DATEN_PFAD, d)
+        except (TypeError, ValueError) as f:
+            log_schreiben("Hinweis: Daten nicht sicherbar (%s)" % f)
         zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
         log_schreiben("%s: Barometer %d, %d Auffaelligkeiten, %d Nachrichten, "
                       "%d Abrufprobleme -> %s"
