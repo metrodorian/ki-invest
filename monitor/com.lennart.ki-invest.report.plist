@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.lennart.ki-invest.report</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/ki_monitor.py</string>
+        <string>--report</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor</string>
+
+    <!-- claude liegt unter /opt/homebrew/bin und muss im Suchpfad stehen,
+         sonst faellt die Einordnung aus. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Werktags um 22:30, also nach dem US-Handelsschluss.
+         Der Bericht oeffnet sich anschliessend im Browser. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/launchd.err.log</string>
+</dict>
+</plist>

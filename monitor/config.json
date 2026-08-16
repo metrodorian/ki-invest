@@ -1,0 +1,142 @@
+{
+  "kennung": "ki-invest-monitor l.duncker@posteo.de",
+
+  "positionen": [
+    {
+      "name": "Nvidia Short",
+      "wkn": "MG4U8W",
+      "ticker": "NVDA",
+      "faktor": -2,
+      "barriere": 324.42,
+      "barriere_stand": "2026-08-14",
+      "einstiegskurs_basiswert": null,
+      "einstieg_datum": null,
+      "kapital_eur": 1500
+    },
+    {
+      "name": "Vertiv Short",
+      "wkn": "MR275A",
+      "ticker": "VRT",
+      "faktor": -2,
+      "barriere": 413.37,
+      "barriere_stand": "2026-08-14",
+      "einstiegskurs_basiswert": null,
+      "einstieg_datum": null,
+      "kapital_eur": 1500
+    }
+  ],
+
+  "zeitlimit_bis": "2026-09-28",
+
+  "schwellen": {
+    "z_score_auffaellig": 2.5,
+    "tagesbewegung_prozent": 5.0,
+    "barriere_warnung_prozent": 25.0,
+    "barriere_alarm_prozent": 15.0,
+    "verlust_warnung_prozent": null,
+    "gewinn_ziel_prozent": null
+  },
+
+  "gruppen": {
+    "Chips und Halbleiter": {
+      "ticker": ["NVDA", "AMD", "AVGO", "TSM", "MU", "SOXX"],
+      "rolle": "Erste Reihe. Reagiert am staerksten auf Effizienzschocks (DeepSeek: -16,9%)."
+    },
+    "Neoclouds": {
+      "ticker": ["CRWV", "NBIS", "IREN", "APLD"],
+      "rolle": "Frueherkennung. Schuldenfinanziert, bricht als Erstes bei Refinanzierungsstress."
+    },
+    "Hyperscaler": {
+      "ticker": ["MSFT", "AMZN", "GOOGL", "META", "ORCL"],
+      "rolle": "Quelle des Capex. Ihre Guidance steuert die gesamte Kette."
+    },
+    "Rechenzentrums-Bau": {
+      "ticker": ["VRT", "SMCI", "ALAB", "MOD", "ETN", "PWR", "STRL", "FIX", "EME"],
+      "rolle": "Zweite Ableitung. Stirbt, wenn nicht mehr gebaut wird."
+    },
+    "Strom fuer Rechenzentren": {
+      "ticker": ["CEG", "VST", "TLN", "BE", "GEV"],
+      "rolle": "Engpassfaktor 2026. Bricht mit, wenn Projekte storniert werden."
+    },
+    "China und Gegenseite": {
+      "ticker": ["BABA", "BIDU", "0981.HK"],
+      "rolle": "Gegenprobe: Gewinnt China, sollten diese Werte relative Staerke zeigen."
+    },
+    "Markt und Stress": {
+      "ticker": ["^GSPC", "^NDX", "RSP", "^VIX", "^VIX3M", "HYG"],
+      "rolle": "Breite, Konzentration und Kreditstress im Gesamtmarkt."
+    }
+  },
+
+  "news_ticker": ["NVDA", "VRT", "MSFT", "AMZN", "GOOGL", "META", "CRWV", "MU"],
+
+  "news_suchen": [
+    { "thema": "Capex-Signale",        "query": "hyperscaler capex data center spending" },
+    { "thema": "Bau-Stornierungen",    "query": "data center project cancelled OR paused OR delayed" },
+    { "thema": "KI-Blase",             "query": "AI bubble capex overinvestment writedown" },
+    { "thema": "China-KI",             "query": "China AI model DeepSeek Qwen efficiency breakthrough" },
+    { "thema": "Chip-Exportkontrolle", "query": "Nvidia China export controls chip restrictions" },
+    { "thema": "Zirkelfinanzierung",   "query": "Nvidia invests customer vendor financing circular" },
+    { "thema": "Rechenzentrums-Strom", "query": "data center power grid moratorium utility" },
+    { "thema": "GPU-Preise",           "query": "GPU rental prices H100 falling oversupply" }
+  ],
+
+  "blogs": [
+    { "quelle": "OpenAI",       "url": "https://openai.com/blog/rss.xml" },
+    { "quelle": "DeepMind",     "url": "https://deepmind.google/blog/rss.xml" },
+    { "quelle": "HuggingFace",  "url": "https://huggingface.co/blog/feed.xml" },
+    { "quelle": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/rss/" }
+  ],
+
+  "sec_firmen": [
+    { "name": "Nvidia",    "cik": "1045810" },
+    { "name": "Vertiv",    "cik": "1674101" },
+    { "name": "CoreWeave", "cik": "1769628" }
+  ],
+
+  "regierung_suchen": [
+    "semiconductor export control",
+    "artificial intelligence data center",
+    "advanced computing chips China"
+  ],
+
+  "news_stichworte_these_bestaetigt": [
+    "capex cut", "capex cuts", "spending cut", "slowdown", "slashes", "slash",
+    "cancels", "cancelled", "canceled", "cancellation", "pause", "paused",
+    "delay", "delayed", "scales back", "scaling back", "oversupply", "glut",
+    "writedown", "write-down", "impairment", "digestion", "bubble",
+    "overcapacity", "backlog decline", "misses", "downgrade", "cuts guidance",
+    "lowers guidance", "default", "bankruptcy", "moratorium", "restrictions",
+    "ban", "halt", "halted", "efficiency breakthrough", "cheaper training",
+    "open source model", "distillation", "layoffs", "shelved", "walks away"
+  ],
+
+  "news_stichworte_these_gefaehrdet": [
+    "raises capex", "increases capex", "capex increase", "boosts spending",
+    "raises guidance", "lifts guidance", "record backlog", "beats", "beat",
+    "record revenue", "upgrade", "upgraded", "expands", "expansion",
+    "new data center", "multi-year deal", "landmark deal", "accelerating demand",
+    "sold out", "supply constrained", "record quarter", "all-time high",
+    "raises outlook", "shortage"
+  ],
+
+  "claude": {
+    "aktiv": true,
+    "befehl": "claude",
+    "zeitlimit_sekunden": 180,
+    "modell": null
+  },
+
+  "termine": [
+    { "datum": "2026-08-26", "was": "Nvidia Q2 FY2027 Zahlen (nach US-Schluss)", "gewicht": "hoch" },
+    { "datum": "2026-09-28", "was": "Zeitlimit erreicht - Positionen schliessen", "gewicht": "hoch" },
+    { "datum": "2026-10-28", "was": "Vertiv Q3 2026 Zahlen (vor US-Eroeffnung)", "gewicht": "mittel" }
+  ],
+
+  "benachrichtigung": {
+    "systemmeldung": true,
+    "ton": true,
+    "ton_name": "Sosumi",
+    "ton_alarm": "Basso"
+  }
+}
