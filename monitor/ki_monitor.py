@@ -68,8 +68,10 @@ def json_laden(pfad, standard):
 
 
 def json_speichern(pfad, daten):
+    # default=str wandelt Datumsobjekte in ISO-Text, damit die Kursreihen
+    # und der Wertverlauf sicherungsfaehig bleiben.
     with open(pfad, "w") as f:
-        json.dump(daten, f, indent=2, ensure_ascii=False)
+        json.dump(daten, f, indent=2, ensure_ascii=False, default=str)
 
 
 def abrufen(url, kennung, versuche=3, pause=1.2):
@@ -121,7 +123,10 @@ def kurse_holen(ticker, kennung, zeitraum="6mo"):
 
     block = ergebnis[0]
     reihe = block["indicators"]["quote"][0].get("close") or []
-    schluss = [k for k in reihe if k is not None]
+    stempel = block.get("timestamp") or []
+    paare = [(t, k) for t, k in zip(stempel, reihe) if k is not None]
+    schluss = [k for _, k in paare]
+    datumsreihe = [date.fromtimestamp(t) for t, _ in paare]
     if len(schluss) < 6:
         raise ValueError("zu wenige Kursdaten")
 
@@ -169,6 +174,7 @@ def kurse_holen(ticker, kennung, zeitraum="6mo"):
         "z_wert": z_wert,
         "abstand_hoch": ((aktuell / hoch) - 1.0) * 100.0 if hoch else None,
         "verlauf": schluss[-60:],
+        "verlauf_datum": datumsreihe[-60:],
         "waehrung": meta.get("currency", ""),
     }
 
@@ -199,6 +205,12 @@ def position_auswerten(position, kurs):
     else:
         ergebnis["basiswert_seit_einstieg"] = None
         ergebnis["schein_seit_einstieg"] = None
+
+    # Erwarteter Wertverlust pro Woche bei Seitwaertslauf des Basiswerts.
+    # Vorausschauend, also planbar - anders als der aufgelaufene Drag.
+    sigma = kurs["sigma_jahr"] / 100.0
+    ergebnis["drag_woche_prozent"] = (
+        exp(0.5 * faktor * (1 - faktor) * sigma * sigma * (7.0 / 365.0)) - 1.0) * 100.0
 
     ergebnis["haltetage"] = None
     ergebnis["drag_prozent"] = None
@@ -688,6 +700,47 @@ def regierung_dokumente(begriff, kennung, maximal=5):
     return eintraege
 
 
+MONATE = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+          "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
+
+
+def datum_lesen(text):
+    """Erkennt die gaengigen Datumsformate aus RSS- und Atom-Feeds."""
+    if not text:
+        return None
+    t = text.strip()
+    m = re.search(r"(\d{1,2})\s+([A-Z][a-z]{2})\s+(\d{4})", t)      # 19 Aug 2026
+    if m and m.group(2) in MONATE:
+        try:
+            return date(int(m.group(3)), MONATE[m.group(2)], int(m.group(1)))
+        except ValueError:
+            return None
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", t)                     # 2026-08-19
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+    return None
+
+
+def alter_bestimmen(eintrag, hoechstalter_tage):
+    """
+    Setzt 'alter_tage' und 'veraltet'. Meldungen ohne lesbares Datum gelten
+    als aktuell - lieber eine alte durchlassen als eine neue verwerfen.
+    """
+    d = datum_lesen(eintrag.get("datum", ""))
+    eintrag["datum_erkannt"] = d.isoformat() if d else None
+    if d is None:
+        eintrag["alter_tage"] = None
+        eintrag["veraltet"] = False
+    else:
+        tage = (date.today() - d).days
+        eintrag["alter_tage"] = tage
+        eintrag["veraltet"] = tage > hoechstalter_tage
+    return eintrag
+
+
 def stichworte_finden(text, stichworte):
     klein = (text or "").lower()
     treffer = []
@@ -1017,6 +1070,166 @@ def sparkline(werte, breite=110, hoehe=26):
             % (breite, hoehe, breite, hoehe, " ".join(punkte), farbe))
 
 
+def positionswert_verlauf(position, kurs):
+    """
+    Rechnet den Eurowert der Position ueber die Zeit.
+
+    Ein Faktor-Papier bildet die TAEGLICHE Bewegung des Basiswerts mit dem
+    Faktor ab. Der Wert ergibt sich deshalb aus dem fortlaufenden Produkt
+    (1 + Faktor * Tagesrendite), nicht aus der Gesamtveraenderung. Vor dem
+    Einstiegstag ist die Kurve rechnerisch - sie zeigt, was die Position
+    gekostet haette, nicht was sie gekostet hat.
+    """
+    kurse = kurs.get("verlauf") or []
+    daten = kurs.get("verlauf_datum") or []
+    stueck = position.get("stueck")
+    einstand = position.get("einstiegskurs_schein")
+    faktor = position.get("faktor", -2)
+    if len(kurse) < 5 or len(daten) != len(kurse) or not stueck or not einstand:
+        return None
+
+    try:
+        einstieg = datetime.strptime(position.get("einstieg_datum", ""), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    # Index des Einstiegstags (oder der letzte Tag davor)
+    anker_index = len(kurse) - 1
+    for i, d in enumerate(daten):
+        if d >= einstieg:
+            anker_index = i
+            break
+
+    # Scheinkurs entlang der Reihe, verankert am Einstand
+    schein = [1.0] * len(kurse)
+    for i in range(anker_index + 1, len(kurse)):
+        r = (kurse[i] / kurse[i - 1]) - 1.0
+        schein[i] = schein[i - 1] * (1.0 + faktor * r)
+    for i in range(anker_index - 1, -1, -1):
+        r = (kurse[i + 1] / kurse[i]) - 1.0
+        teiler = 1.0 + faktor * r
+        schein[i] = schein[i + 1] / teiler if abs(teiler) > 1e-9 else schein[i + 1]
+
+    punkte = []
+    for i, d in enumerate(daten):
+        wert = schein[i] * einstand * stueck
+        punkte.append({"datum": d, "wert": max(0.0, wert), "vor_einstieg": i < anker_index})
+    return {
+        "name": position["name"], "wkn": position.get("wkn", ""),
+        "punkte": punkte, "einsatz": einstand * stueck,
+        "anker": anker_index,
+    }
+
+
+FARBEN = ["var(--akzent)", "var(--warn)"]
+
+
+def wertverlauf_grafik(reihen, hoehe=190, breite=920):
+    """Zwei Linien mit dem Eurowert der Positionen, plus Einsatzlinie."""
+    reihen = [r for r in reihen if r and len(r["punkte"]) > 2]
+    if not reihen:
+        return ""
+
+    n = max(len(r["punkte"]) for r in reihen)
+    alle = [p["wert"] for r in reihen for p in r["punkte"]]
+    alle += [r["einsatz"] for r in reihen]
+    tief, hoch = min(alle), max(alle)
+    spanne = (hoch - tief) or 1.0
+    tief -= spanne * 0.1
+    hoch += spanne * 0.1
+    spanne = hoch - tief
+
+    links, rechts, oben, unten = 58, 14, 12, 26
+    zeichenbreite = breite - links - rechts
+    zeichenhoehe = hoehe - oben - unten
+
+    def x(i, laenge):
+        return links + (i / max(1, laenge - 1)) * zeichenbreite
+
+    def y(w):
+        return oben + (1 - (w - tief) / spanne) * zeichenhoehe
+
+    t = ['<svg class="wertchart" viewBox="0 0 %d %d" width="100%%" '
+         'preserveAspectRatio="none" role="img">' % (breite, hoehe)]
+
+    # Waagerechte Hilfslinien mit Eurobeschriftung
+    for anteil in (0, 0.25, 0.5, 0.75, 1):
+        w = tief + spanne * anteil
+        yy = y(w)
+        t.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="var(--rand)" '
+                 'stroke-width="1"/>' % (links, yy, breite - rechts, yy))
+        t.append('<text x="%.1f" y="%.1f" font-size="10" fill="var(--gedaempft)" '
+                 'text-anchor="end">%d &#8364;</text>' % (links - 6, yy + 3, round(w)))
+
+    for nr, r in enumerate(reihen):
+        farbe = FARBEN[nr % len(FARBEN)]
+        punkte = r["punkte"]
+        anker = r["anker"]
+
+        # Einsatzlinie: ab hier ist Gewinn oder Verlust ablesbar
+        ye = y(r["einsatz"])
+        t.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" '
+                 'stroke-width="1" stroke-dasharray="2 3" opacity=".45"/>'
+                 % (x(anker, len(punkte)), ye, breite - rechts, ye, farbe))
+
+        vor = " ".join("%.1f,%.1f" % (x(i, len(punkte)), y(p["wert"]))
+                       for i, p in enumerate(punkte) if i <= anker)
+        nach = " ".join("%.1f,%.1f" % (x(i, len(punkte)), y(p["wert"]))
+                        for i, p in enumerate(punkte) if i >= anker)
+        if vor.count(",") > 1:
+            t.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="1.4" '
+                     'stroke-dasharray="3 3" opacity=".4"/>' % (vor, farbe))
+        if nach.count(",") > 1:
+            t.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="2.2" '
+                     'stroke-linejoin="round"/>' % (nach, farbe))
+        # Einstiegspunkt und aktueller Punkt
+        t.append('<circle cx="%.1f" cy="%.1f" r="3" fill="var(--grund)" stroke="%s" '
+                 'stroke-width="1.6"/>' % (x(anker, len(punkte)), y(punkte[anker]["wert"]), farbe))
+        t.append('<circle cx="%.1f" cy="%.1f" r="3.4" fill="%s"/>'
+                 % (x(len(punkte) - 1, len(punkte)), y(punkte[-1]["wert"]), farbe))
+
+    def tag(wert):
+        """Datum beschriften - als Objekt oder als Text aus der Sicherung."""
+        if hasattr(wert, "strftime"):
+            return wert.strftime("%d.%m.")
+        teile = str(wert).split("-")
+        return "%s.%s." % (teile[2], teile[1]) if len(teile) == 3 else str(wert)
+
+    erster = reihen[0]["punkte"]
+    t.append('<text x="%.1f" y="%d" font-size="10" fill="var(--gedaempft)">%s</text>'
+             % (links, hoehe - 8, tag(erster[0]["datum"])))
+    t.append('<text x="%.1f" y="%d" font-size="10" fill="var(--gedaempft)" '
+             'text-anchor="end">%s</text>'
+             % (breite - rechts, hoehe - 8, tag(erster[-1]["datum"])))
+    t.append("</svg>")
+
+    # Legende
+    beine = []
+    for nr, r in enumerate(reihen):
+        jetzt = r["punkte"][-1]["wert"]
+        gv = jetzt - r["einsatz"]
+        beine.append(
+            '<span class="bein"><i style="background:%s"></i>%s '
+            '<b>%s&nbsp;&#8364;</b> <span class="%s">%+.0f&nbsp;&#8364; (%+.1f%%)</span></span>'
+            % (FARBEN[nr % len(FARBEN)], r["name"],
+               ("%.0f" % jetzt).replace(",", "."),
+               "gut" if gv >= 0 else "schlecht", gv, gv / r["einsatz"] * 100))
+    gesamt_jetzt = sum(r["punkte"][-1]["wert"] for r in reihen)
+    gesamt_ein = sum(r["einsatz"] for r in reihen)
+    gv = gesamt_jetzt - gesamt_ein
+    beine.append('<span class="bein gesamt">Gesamt <b>%.0f&nbsp;&#8364;</b> '
+                 '<span class="%s">%+.0f&nbsp;&#8364; (%+.1f%%)</span></span>'
+                 % (gesamt_jetzt, "gut" if gv >= 0 else "schlecht", gv,
+                    gv / gesamt_ein * 100))
+
+    return ('<div class="wertkarte">%s<div class="legende">%s</div>'
+            '<div class="klein">Gestrichelt vor dem Einstieg: rechnerischer Verlauf, '
+            'nicht dein tatsaechlicher. Die waagerechte Linie je Farbe ist der '
+            'Einsatz. Berechnet aus der Tagesbewegung des Basiswerts mal Faktor, '
+            'ohne Produktkosten &ndash; der verbindliche Kurs steht im Depot.</div></div>'
+            % ("".join(t), " ".join(beine)))
+
+
 def barometer_verlauf_balken(verlauf):
     """Balkenreihe der letzten Barometer-Staende. Der Trend sagt mehr als der Stand."""
     if not verlauf or len(verlauf) < 2:
@@ -1125,6 +1338,20 @@ ul.liste li:last-child{border-bottom:none}
  padding-top:11px;margin:13px 0 10px;font-weight:600}
 .fazit p.gemessen{font-size:14px;color:var(--gedaempft);line-height:1.55}
 .fazit p.gemessen b{color:var(--text);font-weight:600}
+.wertkarte{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
+ padding:14px 16px 12px;margin:16px 0 4px;box-shadow:var(--schatten)}
+.wertchart{display:block;width:100%;height:auto;overflow:visible}
+.legende{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 6px;font-size:13px;
+ align-items:center}
+.legende .bein{display:flex;align-items:center;gap:6px}
+.legende .bein i{width:11px;height:3px;border-radius:2px;display:inline-block}
+.legende .gesamt{margin-left:auto;padding-left:16px;border-left:1px solid var(--rand)}
+.korrektur{background:var(--flaeche2);border:1px dashed var(--akzent);border-radius:10px;
+ padding:12px 15px;margin-bottom:11px;font-size:13px;line-height:1.5}
+.korrektur b{color:var(--akzent)}
+.alt{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+ background:var(--flaeche2);color:var(--gedaempft);border-radius:3px;
+ padding:1px 5px;margin-right:6px;font-weight:600}
 .warnfeld{background:var(--flaeche2);border:1px dashed var(--warn);
  border-radius:10px;padding:11px 15px;margin-bottom:10px;font-size:12.5px;
  color:var(--gedaempft);line-height:1.5}
@@ -1193,6 +1420,11 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                 ('<div style="text-align:right"><div class="klein" '
                  'style="margin-bottom:3px">Verlauf</div>%s</div>' % balken)
                 if balken else ""))
+
+    # ---- Wertverlauf der Positionen
+    grafik = wertverlauf_grafik([p.get("wertverlauf") for p in positionen])
+    if grafik:
+        t.append(grafik)
 
     # ---- Zusammenfassung in Worten
     claude_saetze = []
@@ -1290,6 +1522,10 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
 
     # ---- Auffaelligkeiten
     t.append("<h2>Auffaelligkeiten</h2>")
+    if (claude_urteil and not claude_urteil.get("fehler")
+            and claude_urteil.get("uebersehen")):
+        t.append('<div class="korrektur"><b>Vorab, von Claude geprueft:</b> %s</div>'
+                 % html_schuetzen(claude_urteil["uebersehen"]))
     echte = [a for a in alarme if a[0] == "alarm"]
     hinweise = [a for a in alarme if a[0] == "hinweis"]
     if not alarme:
@@ -1308,7 +1544,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     t.append("<h2>Positionen</h2><div class='tabelle'><table><tr><th>Position</th><th>WKN</th>"
              "<th>Verlauf 3 Monate</th><th class='z'>Kurs</th><th class='z'>Tag</th>"
              "<th class='z'>Schein Tag</th><th class='z'>seit Einstieg</th>"
-             "<th class='z'>Puffer</th><th class='z'>Drag</th></tr>")
+             "<th class='z'>Puffer</th><th class='z'>Drag bisher</th>"
+             "<th class='z'>Drag/Woche</th></tr>")
     for p in positionen:
         puffer = p.get("barriere_abstand")
         pk = "neutral"
@@ -1317,7 +1554,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append("<tr><td>%s</td><td class='klein'>%s</td><td>%s</td>"
                  "<td class='z'>%.2f</td><td class='z %s'>%s</td>"
                  "<td class='z %s'>%s</td><td class='z %s'>%s</td>"
-                 "<td class='z %s'>%s</td><td class='z neutral'>%s</td></tr>" % (
+                 "<td class='z %s'>%s</td><td class='z neutral'>%s</td>"
+                 "<td class='z neutral'>%s</td></tr>" % (
                      p["name"], p.get("wkn", ""), sparkline(p.get("verlauf")),
                      p["kurs"],
                      klasse_fuer(p["tag_prozent"]), zahl(p["tag_prozent"], 2, "%"),
@@ -1326,7 +1564,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      klasse_fuer(p.get("schein_seit_einstieg"), True),
                      zahl(p.get("schein_seit_einstieg"), 1, "%"),
                      pk, ("%.1f%%" % puffer) if puffer is not None else "&ndash;",
-                     zahl(p.get("drag_prozent"), 1, "%")))
+                     zahl(p.get("drag_prozent"), 1, "%"),
+                     zahl(p.get("drag_woche_prozent"), 1, "%")))
     t.append("</table></div>")
     t.append('<div class="klein" style="margin-top:8px">Schein-Werte sind '
              'Naeherungen (Basiswert-Bewegung mal Faktor, ohne Produktkosten). '
@@ -1406,6 +1645,11 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     if not relevant:
         t.append('<div class="karte klein">Keine Schlagzeile mit passenden '
                  'Stichworten gefunden.</div>')
+    veraltet_anzahl = konfig.get("_verworfen", 0)
+    if veraltet_anzahl:
+        t.append('<div class="klein" style="margin-bottom:8px">%d aeltere Meldungen '
+                 'wurden aussortiert, weil sie den Filter fuer das '
+                 'Veroeffentlichungsdatum nicht bestanden haben.</div>' % veraltet_anzahl)
     neue_anzahl = sum(1 for n in relevant if n.get("neu"))
     if neue_anzahl:
         t.append('<div class="klein" style="margin-bottom:8px"><span class="neu">neu</span>'
@@ -1530,7 +1774,9 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         if daten.get("fehler"):
             fehler.append("Position %s ohne Kurs" % pos.get("name", "?"))
             continue
-        positionen.append(position_auswerten(pos, daten))
+        ausgewertet = position_auswerten(pos, daten)
+        ausgewertet["wertverlauf"] = positionswert_verlauf(pos, daten)
+        positionen.append(ausgewertet)
 
     gute_kurse = {k: v for k, v in kurse.items() if not v.get("fehler")}
     indikatoren = indikatoren_bauen(gute_kurse, gruppen)
@@ -1545,7 +1791,9 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     # Nachrichten
     fuer_these = konfig.get("news_stichworte_these_bestaetigt", [])
     gegen_these = konfig.get("news_stichworte_these_gefaehrdet", [])
-    nachrichten, gesehen = [], set()
+    nachrichten, gesehen, verworfen = [], set(), []
+
+    hoechstalter = konfig.get("nachrichten_hoechstalter_tage", 14)
 
     def aufnehmen(eintraege, thema=""):
         for e in eintraege:
@@ -1554,6 +1802,10 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
                 continue
             gesehen.add(schluessel)
             e["thema"] = thema
+            alter_bestimmen(e, hoechstalter)
+            if e["veraltet"]:
+                verworfen.append(e)
+                continue
             nachrichten.append(einordnen(e, fuer_these, gegen_these))
 
     for ticker in konfig.get("news_ticker", []):
@@ -1574,6 +1826,10 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     blogs = []
     for eintrag in konfig.get("blogs", []):
         for b in rss_lesen(eintrag["url"], kennung, eintrag["quelle"], 8):
+            alter_bestimmen(b, hoechstalter * 3)   # Fachbeitraege altern langsamer
+            if b["veraltet"]:
+                verworfen.append(b)
+                continue
             blogs.append(einordnen(b, fuer_these, gegen_these))
     if not blogs:
         fehler.append("Keine Blog-Beitraege abrufbar")
@@ -1608,6 +1864,7 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         "zusammenfassung": zusammenfassung,
         "nachrichten": nachrichten, "regierung": regierung, "blogs": blogs,
         "sec": sec, "alarme": alarme, "claude": claude_urteil, "fehler": fehler,
+        "verworfen": len(verworfen),
     }
 
 
@@ -1625,6 +1882,7 @@ def neuheiten_markieren(nachrichten, zustand):
 
 
 def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None):
+    konfig["_verworfen"] = d.get("verworfen", 0)
     html = bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
                          d["indikatoren"], d["barometer"], d["nachrichten"],
                          d["regierung"], d["blogs"], d["sec"], d["alarme"],

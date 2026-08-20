@@ -57,8 +57,14 @@ Schalter:
 
 ## Was beobachtet wird
 
+**Wertverlauf ganz oben** — zwei Linien mit dem Eurowert beider Positionen.
+Durchgezogen ab dem Einstieg, gestrichelt davor (rechnerisch, nicht tatsächlich).
+Die waagerechte Linie je Farbe ist der Einsatz, daran ist Gewinn und Verlust
+direkt ablesbar.
+
 **Positionen** — Kurs, Tagesbewegung, geschätzte Schein-Bewegung, Abstand zur
-Knock-Out-Barriere, aufgelaufener Volatilitäts-Drag.
+Knock-Out-Barriere, aufgelaufener Drag und der **erwartete Drag pro Woche** bei
+Seitwärtslauf — die vorausschauende Zahl, mit der sich planen lässt.
 
 **Acht Marktgruppen** — Chips, Neoclouds, Hyperscaler, Rechenzentrums-Bau, Strom,
 China-Plattformen, China-Chipfertigung, Marktbreite und Stress.
@@ -94,6 +100,13 @@ Short-These.
 - Blogs von OpenAI, DeepMind, HuggingFace, DataCenterDynamics, SemiAnalysis
   (veröffentlicht den GPU-Mietpreisindex), Utility Dive (Netzanschlüsse und
   Versorger) und The Register
+
+Meldungen älter als **14 Tage** werden aussortiert (Fachbeiträge: 42 Tage),
+damit keine Altmeldungen als aktuelles Signal durchgehen. Die Stichwortlisten
+sind bewusst auf Genauigkeit statt Vollständigkeit getrimmt: lieber wenige
+richtige Treffer als viele falsche im Alarmblock. Was der Filter übersieht,
+fängt Claude ab — seine Korrektur steht als Hinweis **über** den
+Auffälligkeiten.
 
 Effizienzdurchbrüche bei Modellen zählen dabei **für** die These, auch wenn sie
 positiv klingen — der DeepSeek-Moment begann mit einer Modellveröffentlichung,
