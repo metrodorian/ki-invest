@@ -378,6 +378,5 @@
     "aktiv": true,
     "token_datei": "/home/Nutzer/ki-invest/telegram.token",
     "chat_datei": "/home/Nutzer/ki-invest/telegram.chat"
-  },
-  "_hinweis": "Live-Konfiguration des Pi unter /home/Nutzer/ki-invest/config.json. Token und Schluessel stehen in eigenen Dateien mit Rechten 600."
+  }
 }

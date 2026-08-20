@@ -1395,6 +1395,79 @@ KERNINDIKATOREN = ["Kreditrisiko-Aufschlag", "VIX-Terminstruktur",
                    "Konzentrations-Spread"]
 
 
+STEUERUNG = """
+<div class="steuerung" id="steuerung" hidden>
+  <div class="kern-titel" style="margin-top:16px">Steuerung</div>
+  <button type="button" data-aktion="neu">Jetzt neu rechnen</button>
+  <button type="button" data-aktion="ruhe" id="ruheknopf">Alarme stumm bis morgen</button>
+  <button type="button" data-aktion="probealarm" class="leise">Probealarm</button>
+  <div class="vermerkfeld">
+    <input type="text" id="vermerk" placeholder="Vermerk fuer den Bericht"
+           maxlength="200" autocomplete="off">
+    <button type="button" data-aktion="notiz" class="leise">Merken</button>
+  </div>
+  <div class="rueckmeldung" id="rueckmeldung" hidden></div>
+</div>
+<script>
+(function () {
+  var block = document.getElementById("steuerung");
+  var meldung = document.getElementById("rueckmeldung");
+  var ruheknopf = document.getElementById("ruheknopf");
+  var feld = document.getElementById("vermerk");
+  var ruhtBis = null;
+
+  function sagen(text, gut) {
+    meldung.textContent = text;
+    meldung.className = "rueckmeldung " + (gut === false ? "schlecht" : "gut");
+    meldung.hidden = false;
+    setTimeout(function () { meldung.hidden = true; }, 9000);
+  }
+
+  function zustand() {
+    fetch("/aktion/zustand", { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) {
+        block.hidden = false;
+        ruhtBis = z.ruhe_bis;
+        ruheknopf.textContent = z.ruhe_bis
+          ? "Stumm bis " + z.ruhe_bis + " \u2013 aufheben"
+          : "Alarme stumm bis morgen";
+        ruheknopf.dataset.aktion = z.ruhe_bis ? "ruhe-aus" : "ruhe";
+        ruheknopf.classList.toggle("aktiv", !!z.ruhe_bis);
+        if (z.notiz && !feld.value) { feld.value = z.notiz; }
+      })
+      .catch(function () { block.hidden = true; });
+  }
+
+  block.addEventListener("click", function (e) {
+    var knopf = e.target.closest("button[data-aktion]");
+    if (!knopf) { return; }
+    var was = knopf.dataset.aktion;
+    var ziel = "/aktion/" + was;
+    if (was === "notiz") {
+      ziel += "?text=" + encodeURIComponent(feld.value.trim());
+    }
+    knopf.disabled = true;
+    fetch(ziel, { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) { sagen(z.text || "Erledigt.", z.ok !== false); zustand(); })
+      .catch(function () { sagen("Hat nicht geklappt.", false); })
+      .finally(function () { knopf.disabled = false; });
+  });
+
+  feld.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      block.querySelector('button[data-aktion="notiz"]').click();
+    }
+  });
+
+  zustand();
+  setInterval(zustand, 30000);
+})();
+</script>
+"""
+
+
 def kernbox(indikatoren, gruppen_ansicht):
     """
     Schmale Spalte mit den Kennzahlen, die den Zustand des Systems beschreiben -
@@ -1457,6 +1530,7 @@ def kernbox(indikatoren, gruppen_ansicht):
                  'einnimmt, verteilt der Markt die Marge um &ndash; das ist etwas '
                  'anderes als ein platzender Ausbau.</div>')
 
+    t.append(STEUERUNG)
     t.append("</aside>")
     return "".join(t)
 
@@ -1760,6 +1834,26 @@ ul.liste li:last-child{border-bottom:none}
 .kern-tab tr:last-child td{border-bottom:none}
 .kern-tab td.z{text-align:right;font-variant-numeric:tabular-nums;font-weight:650;
  white-space:nowrap}
+.steuerung[hidden]{display:none !important}
+.steuerung{border-top:1px solid var(--rand);margin-top:14px}
+.steuerung button{display:block;width:100%;font:inherit;font-size:13px;
+ font-weight:600;cursor:pointer;background:var(--akzent);color:#fff;border:none;
+ border-radius:8px;padding:9px 12px;margin-bottom:6px;text-align:left}
+.steuerung button:hover:not(:disabled){filter:brightness(1.08)}
+.steuerung button:disabled{opacity:.5;cursor:default}
+.steuerung button.leise{background:var(--flaeche2);color:var(--text);
+ border:1px solid var(--rand);font-weight:500}
+.steuerung button.aktiv{background:var(--warn)}
+.vermerkfeld{display:flex;gap:5px;margin-top:9px}
+.vermerkfeld input{flex:1;min-width:0;font:inherit;font-size:12.5px;
+ background:var(--grund);color:var(--text);border:1px solid var(--rand);
+ border-radius:8px;padding:8px 10px}
+.vermerkfeld button{width:auto;margin:0;white-space:nowrap;padding:8px 12px}
+.rueckmeldung{font-size:12px;line-height:1.45;border-radius:7px;padding:8px 11px;
+ margin-top:9px}
+.rueckmeldung[hidden]{display:none !important}
+.rueckmeldung.gut{background:rgba(21,128,61,.12);color:var(--gut)}
+.rueckmeldung.schlecht{background:rgba(185,28,28,.12);color:var(--schlecht)}
 
 .wertkarte{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
  padding:14px 16px 12px;margin:16px 0 4px;box-shadow:var(--schatten)}

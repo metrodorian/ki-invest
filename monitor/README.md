@@ -192,7 +192,24 @@ Der Monitor läuft auf dem Raspberry Pi (OMV) unter `~/ki-invest`, gesteuert
 | beim Systemstart | Webserver auf Port 8088 |
 
 **Bericht im Browser:** http://192.168.178.20:8088/ — mit Archiv, Blättern über
-Pfeiltasten oder Knöpfe, und dem roten Balken zum Abstellen eines Alarms.
+Pfeiltasten oder Knöpfe, dem roten Balken zum Abstellen eines Alarms und einer
+Steuerung in der rechten Spalte:
+
+| Knopf | Wirkung |
+|---|---|
+| Jetzt neu rechnen | voller Lauf samt Einordnung, im Hintergrund |
+| Alarme stumm bis morgen | Stummschaltung bis 7 Uhr, Knopf wird zum Aufheben |
+| Probealarm | löst die ganze Meldekette einmal aus |
+| Vermerk | Text erscheint oben im Bericht, leeres Feld löscht ihn |
+
+Dieselben Funktionen gibt es über Telegram, siehe **hilfe** im Chat.
+
+### Zeitplan der Läufe
+
+Die Datengrundlage wird zu :10, :20, :30, :40 und :50 aufgefrischt, ohne Claude
+zu fragen — die zuletzt gesicherte Einordnung bleibt im Bericht stehen, mit
+sichtbarem Zeitstempel. Zur vollen Stunde läuft sie zusätzlich mit Claude und
+erzeugt einen Archiveintrag. Zwischen 23 und 7 Uhr ruht alles.
 
 ### Eilmeldung
 
