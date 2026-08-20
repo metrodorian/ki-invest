@@ -564,8 +564,6 @@
     "bridge": "BRIDGE-ADRESSE",
     "schluessel_datei": "hue.key",
     "lampen": [
-      1,
-      2,
       3
     ],
     "dauerblink_lampen": [
