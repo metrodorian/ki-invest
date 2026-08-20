@@ -39,6 +39,7 @@ from statistics import pstdev, mean
 
 BASIS = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PFAD = os.path.join(BASIS, "config.json")
+LOKAL_PFAD = os.path.join(BASIS, "config.lokal.json")
 STATE_PFAD = os.path.join(BASIS, "state.json")
 DATEN_PFAD = os.path.join(BASIS, "daten.json")
 CLAUDE_PFAD = os.path.join(BASIS, "claude.json")
@@ -212,6 +213,65 @@ def scheinkurs_holen(isin, kennung):
     return {"geld": geld, "brief": brief,
             "spread_prozent": ((brief - geld) / brief * 100.0)
                               if (geld and brief) else None}
+
+
+# Schluessel, die nie in die geteilte Datei gehoeren: Zugangsdaten, Rechnerpfade
+# und Laufzeitzustand. Alles andere ist auf jedem Rechner gleich.
+LOKALE_SCHLUESSEL = ("mail", "telegram", "hue", "bericht_kopie", "ruhe_bis")
+
+
+def konfig_laden():
+    """
+    Liest die Konfiguration als zwei Schichten.
+
+    `config.json` ist auf jedem Rechner identisch und liegt im Repo - Positionen,
+    Gruppen, Stichworte, Schwellen. `config.lokal.json` liegt daneben, gehoert
+    nicht ins Repo und traegt alles Maschinenabhaengige: Mail, Telegram, Hue,
+    Pfade und die Stummschaltung. Sie wird darübergelegt.
+
+    Vorher stand beides in einer Datei. Ein Kopieren der config.json vom Mac auf
+    den Pi hat dort die Meldekette geloescht, ohne dass es jemand gemerkt haette.
+    Mit der Trennung ist das ausgeschlossen: Die geteilte Datei enthaelt nichts
+    mehr, was ein Kopieren kaputtmachen koennte.
+    """
+    roh = json_laden(CONFIG_PFAD, None)
+    if roh is None:
+        return None
+    lokal = json_laden(LOKAL_PFAD, {}) or {}
+    konfig = json.loads(json.dumps(roh))
+    for schluessel, wert in lokal.items():
+        if schluessel.startswith("_"):
+            continue
+        if isinstance(wert, dict) and isinstance(konfig.get(schluessel), dict):
+            gemischt = dict(konfig[schluessel])
+            gemischt.update(wert)
+            konfig[schluessel] = gemischt
+        else:
+            konfig[schluessel] = wert
+    return konfig
+
+
+def konfig_speichern(konfig):
+    """
+    Schreibt beide Schichten getrennt zurueck.
+
+    Was in LOKALE_SCHLUESSEL steht, landet in der lokalen Auflage, alles andere
+    in der geteilten Datei. So bleibt config.json zwischen den Rechnern
+    identisch und kopierbar, ohne dass Zugangsdaten mitwandern oder eine
+    Stummschaltung vom einen Rechner den anderen verstummen laesst.
+    """
+    geteilt, lokal = {}, {}
+    for schluessel, wert in konfig.items():
+        if schluessel.startswith("_"):
+            continue
+        (lokal if schluessel in LOKALE_SCHLUESSEL else geteilt)[schluessel] = wert
+    # Werte, die die lokale Auflage schon kannte, aber gerade nicht gesetzt sind
+    # (etwa eine aufgehobene Stummschaltung), fallen damit sauber weg.
+    vorher = json_laden(LOKAL_PFAD, {}) or {}
+    if "_hinweis" in vorher:
+        lokal["_hinweis"] = vorher["_hinweis"]
+    json_speichern(CONFIG_PFAD, geteilt)
+    json_speichern(LOKAL_PFAD, lokal)
 
 
 def kennzahlen_text(konfig):
@@ -4195,7 +4255,18 @@ def main():
     else:
         mit_claude = "--ohne-claude" not in sys.argv and modus != "watch"
 
-    konfig = json_laden(CONFIG_PFAD, None)
+    konfig = konfig_laden()
+    if konfig is not None and konfig.get("rolle") == "arbeitsplatz" \
+            and "--erzwingen" not in sys.argv:
+        # Berichte entstehen ausschliesslich auf dem ueberwachenden Rechner.
+        # Zwei Quellen wuerden zwei Archive, zwei Zaehlstaende und zwei
+        # Wahrheiten erzeugen - und der Arbeitsplatz laeuft nicht durch.
+        print("Dieser Rechner ist als Arbeitsplatz eingetragen (rolle in "
+              "config.lokal.json). Berichte entstehen nur im Betrieb.\n"
+              "  ./betrieb.sh lauf --pi        Lauf auf dem Pi anstossen\n"
+              "  ./betrieb.sh bericht --pi     Tagesbericht auf dem Pi\n"
+              "Zum bewussten Uebergehen: --erzwingen")
+        return 2
     if konfig is None:
         log_schreiben("FEHLER: config.json nicht lesbar")
         systemmeldung("KI-Invest", "config.json fehlt oder ist fehlerhaft", "Basso")

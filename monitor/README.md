@@ -279,13 +279,36 @@ Nichts davon steht im Repo oder in der Konfiguration:
 
 Alle mit Rechten 600. `config.pi.json` im Repo ist eine bereinigte Vorlage.
 
-> **Konfiguration nie vom Mac auf den Pi kopieren.** Die beiden Fassungen
-> unterscheiden sich absichtlich: Nur die Pi-Fassung enthaelt die Bloecke
-> `mail`, `telegram` und `hue` sowie den richtigen `bericht_kopie`-Pfad. Ein
-> `scp config.json` vom Mac loescht sie und legt damit die ganze Meldekette
-> still - lautlos, denn die laufenden Prozesse merken es erst beim Neustart.
-> Aenderungen an der Konfiguration stattdessen direkt auf dem Pi einspielen
-> oder gezielt einzelne Schluessel ergaenzen.
+### Zwei Schichten
+
+Die Konfiguration liegt in zwei Dateien, damit auf allen Rechnern derselbe Code
+und dieselbe geteilte Konfiguration laufen kann:
+
+| Datei | Inhalt | Im Repo |
+|---|---|---|
+| `config.json` | Positionen, Gruppen, Stichworte, Schwellen, Modellpreise | ja, ueberall identisch |
+| `config.lokal.json` | Mail, Telegram, Hue, Pfade, **Rolle**, Stummschaltung | nein |
+
+Die lokale Auflage wird ueber `config.json` gelegt. `config.json` ist damit
+gefahrlos zwischen den Rechnern kopierbar - genau das ging vorher schief: Ein
+`scp` der Mac-Fassung hatte auf dem Pi die Bloecke `mail`, `telegram` und `hue`
+geloescht und die Meldekette lautlos stillgelegt.
+
+`config.lokal.beispiel.json` zeigt den Aufbau. Geschrieben wird ebenfalls
+getrennt: Was in `LOKALE_SCHLUESSEL` steht, landet in der lokalen Auflage, alles
+andere in der geteilten Datei.
+
+### Rollen
+
+In `config.lokal.json` steht, wofuer der Rechner da ist:
+
+- `"rolle": "betrieb"` - ueberwacht, erzeugt Berichte, schickt Alarme (der Pi)
+- `"rolle": "arbeitsplatz"` - entwickelt nur, erzeugt **nie** einen Bericht (der Mac)
+
+Auf einem Arbeitsplatz weigert sich `ki_monitor.py` zu laufen, und `betrieb.sh`
+sperrt `lauf`, `bericht` und `probealarm`. Zwei Quellen wuerden zwei Archive und
+zwei Zaehlstaende erzeugen. Vom Arbeitsplatz aus fuehrt `--pi` zum Ziel;
+`--erzwingen` uebergeht die Sperre bewusst.
 
 Mail geht über den lokalen Postfix, deshalb sind dort keine Zugangsdaten nötig.
 

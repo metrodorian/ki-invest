@@ -11,7 +11,7 @@ sys.path.insert(0, BASIS)
 import ki_monitor as km                                          # noqa: E402
 
 d = km.json_laden(os.path.join(BASIS, "daten.json"), None)
-konfig = km.json_laden(os.path.join(BASIS, "config.json"), None)
+konfig = km.konfig_laden()
 if not d or not konfig:
     sys.exit(1)
 

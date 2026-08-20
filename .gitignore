@@ -10,3 +10,11 @@ monitor/*.chat
 monitor/*.offset
 monitor/alarm.txt
 monitor/blink.*
+
+# Maschinenabhaengige Auflage: Zugangsdaten, Pfade, Rolle, Stummschaltung.
+# Wird ueber config.json gelegt und gehoert nie ins Repo.
+monitor/config.lokal.json
+
+# Python-Zwischenstaende
+__pycache__/
+*.pyc

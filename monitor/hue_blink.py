@@ -136,7 +136,9 @@ def telegram_erinnerung(konfig, text, nummer):
 
 
 def main():
-    konfig = json.load(open(os.path.join(BASIS, "config.json")))
+    sys.path.insert(0, BASIS)
+    import ki_monitor as km
+    konfig = km.konfig_laden() or {}
     einst = konfig.get("hue", {})
     lampen = einst.get("dauerblink_lampen") or einst.get("lampen") or []
     if not einst.get("aktiv") or not lampen:

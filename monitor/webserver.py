@@ -29,16 +29,17 @@ PORT = int(os.environ.get("KI_INVEST_PORT", "8088"))
 
 
 def konfig_lesen():
-    try:
-        with open(CONFIG) as f:
-            return json.load(f)
-    except (IOError, ValueError):
-        return {}
+    # Gemeinsamer Lader: config.json plus die lokale Auflage darueber.
+    sys.path.insert(0, BASIS)
+    import ki_monitor as km
+    return km.konfig_laden() or {}
 
 
 def konfig_schreiben(konfig):
-    with open(CONFIG, "w") as f:
-        json.dump(konfig, f, indent=2, ensure_ascii=False, default=str)
+    # Schreibt nur die geteilte Schicht - Zugangsdaten bleiben lokal.
+    sys.path.insert(0, BASIS)
+    import ki_monitor as km
+    km.konfig_speichern(konfig)
 
 
 def ruhe_aktiv(konfig):

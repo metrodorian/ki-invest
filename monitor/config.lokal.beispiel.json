@@ -1,0 +1,33 @@
+{
+  "_hinweis": "Diese Datei liegt neben config.json, gehoert NICHT ins Repo und traegt alles Maschinenabhaengige. Sie wird ueber config.json gelegt. Als config.lokal.json kopieren und ausfuellen. 'rolle' ist 'betrieb' auf dem ueberwachenden Rechner und 'arbeitsplatz' sonst - Arbeitsplaetze erzeugen keine Berichte.",
+  "mail": {
+    "aktiv": true,
+    "server": "127.0.0.1",
+    "port": 25,
+    "von": "ki-invest-monitor@localhost",
+    "an": "DEINE-ADRESSE",
+    "web_adresse": "http://RECHNER-ADRESSE:8088/"
+  },
+  "telegram": {
+    "aktiv": true,
+    "token_datei": "telegram.token",
+    "chat_datei": "telegram.chat"
+  },
+  "hue": {
+    "aktiv": true,
+    "bridge": "BRIDGE-ADRESSE",
+    "schluessel_datei": "hue.key",
+    "lampen": [
+      3
+    ],
+    "dauerblink_lampen": [
+      3
+    ],
+    "telegram_takt_sekunden": 5,
+    "nacht_von": 22,
+    "nacht_bis": 7,
+    "nacht_kontingent_sekunden": 300
+  },
+  "bericht_kopie": "/PFAD/ZUM/monitor/web/index.html",
+  "rolle": "betrieb"
+}

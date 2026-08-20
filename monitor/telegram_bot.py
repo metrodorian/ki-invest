@@ -46,7 +46,9 @@ HILFE = """<b>Befehle</b>
 
 
 def konfig_laden():
-    return json.load(open(os.path.join(BASIS, "config.json")))
+    sys.path.insert(0, BASIS)
+    import ki_monitor as km
+    return km.konfig_laden() or {}
 
 
 def zugang(konfig):
@@ -218,8 +220,9 @@ def antwort_termine(konfig):
 
 
 def konfig_speichern(konfig):
-    with open(os.path.join(BASIS, "config.json"), "w") as f:
-        json.dump(konfig, f, indent=2, ensure_ascii=False, default=str)
+    sys.path.insert(0, BASIS)
+    import ki_monitor as km
+    km.konfig_speichern(konfig)
 
 
 def antwort_ruhe(konfig, rest):

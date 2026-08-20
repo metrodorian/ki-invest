@@ -22,10 +22,16 @@
 #   probealarm-aus        laufenden Alarm abstellen
 #   pruefen               Konfiguration auf Vollstaendigkeit pruefen
 #
-# Absichtlich NICHT enthalten: ein Befehl, der config.json von hier auf den Pi
-# kopiert. Die beiden Fassungen unterscheiden sich (mail, telegram, hue und der
-# Pfad in bericht_kopie stehen nur auf dem Pi). Ein Kopieren legt die Meldekette
-# lautlos still.
+# Rollen: In config.lokal.json steht, wofuer der Rechner da ist.
+#   rolle = "betrieb"       ueberwacht, erzeugt Berichte, schickt Alarme (der Pi)
+#   rolle = "arbeitsplatz"  entwickelt nur, erzeugt nie einen Bericht (der Mac)
+# Die Befehle lauf, bericht und probealarm gibt es deshalb nur im Betrieb. Vom
+# Arbeitsplatz aus fuehren sie mit --pi zum Ziel.
+#
+# Konfiguration in zwei Schichten:
+#   config.json        auf jedem Rechner identisch, im Repo, gefahrlos kopierbar
+#   config.lokal.json  Mail, Telegram, Hue, Pfade, Rolle, Stummschaltung -
+#                      nicht im Repo, wird ueber config.json gelegt
 
 set -u
 
@@ -59,6 +65,28 @@ if [ "$AUF_PI" = "1" ]; then
 fi
 
 cd "$HIER" || exit 1
+
+# Rolle dieses Rechners: "betrieb" ueberwacht und erzeugt Berichte,
+# "arbeitsplatz" tut das nie. Steht in config.lokal.json.
+ROLLE=$("$PYTHON" - <<'PYEND' 2>/dev/null
+import json
+try:
+    print((json.load(open("config.lokal.json")) or {}).get("rolle") or "unbekannt")
+except Exception:
+    print("unbekannt")
+PYEND
+)
+
+# Befehle, die einen Bericht erzeugen oder die Meldekette ausloesen, gibt es nur
+# im Betrieb. Auf dem Arbeitsplatz entstuenden sonst ein zweites Archiv und ein
+# zweiter Zaehlstand - und niemand wuesste, welcher gilt.
+nur_im_betrieb() {
+    [ "$ROLLE" = "betrieb" ] && return 0
+    echo "Dieser Rechner ist '$ROLLE', nicht 'betrieb'."
+    echo "'$1' erzeugt einen Bericht oder loest Alarm aus - das geschieht nur auf dem Pi:"
+    echo "    ./betrieb.sh $1 --pi"
+    return 1
+}
 
 # ------------------------------------------------------------------ Werkzeuge
 
@@ -130,15 +158,18 @@ logs)
     ;;
 
 lauf)
+    nur_im_betrieb lauf || exit 1
     echo "Starte Monitorlauf ${ARGUMENTE[*]:-ohne Claude} ..."
     "$PYTHON" ki_monitor.py --web ${ARGUMENTE[*]:-} 2>&1 | tail -20
     ;;
 
 bericht)
+    nur_im_betrieb bericht || exit 1
     "$PYTHON" ki_monitor.py --report 2>&1 | tail -20
     ;;
 
 probealarm)
+    nur_im_betrieb probealarm || exit 1
     echo "Loest die volle Meldekette aus - die Lampe blinkt, bis sie abgestellt wird."
     "$PYTHON" probealarm.py 2>&1 | tail -20
     ;;
@@ -155,11 +186,23 @@ probealarm-aus)
 pruefen)
     "$PYTHON" - <<'PY'
 import json, os, sys
+sys.path.insert(0, ".")
+import ki_monitor as km
 fehlt = []
-try:
-    c = json.load(open("config.json"))
-except Exception as f:
-    print("config.json nicht lesbar:", f); sys.exit(1)
+c = km.konfig_laden()
+if c is None:
+    print("config.json nicht lesbar"); sys.exit(1)
+rolle = c.get("rolle") or "unbekannt"
+if rolle != "betrieb":
+    # Ein Arbeitsplatz braucht die Meldekette nicht - dort waere ihr Fehlen
+    # kein Mangel, sondern der Normalfall.
+    modelle = (c.get("tokenpreise") or {}).get("modelle") or []
+    ohne = [m["modell"] for m in modelle if not m.get("ausgabe")]
+    print("Rolle '%s': geteilte Konfiguration mit %d Modellen%s."
+          % (rolle, len(modelle),
+             ", ohne Preis: " + ", ".join(ohne) if ohne else ""))
+    print("Meldekette wird hier nicht geprueft - die gehoert in den Betrieb.")
+    sys.exit(0)
 
 # Die Bloecke, ohne die die Meldekette still bleibt - und zwar ohne Fehlermeldung.
 for block, pflicht in (("mail", ("aktiv", "an")),

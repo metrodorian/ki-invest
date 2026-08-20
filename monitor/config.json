@@ -339,7 +339,6 @@
     "ton_alarm": "Basso"
   },
   "nachrichten_hoechstalter_tage": 14,
-  "bericht_kopie": "/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/web/index.html",
   "tokenpreise": {
     "stand": "2026-08-20",
     "quelle": "Rangliste swfte.com/ai/leaderboard (Qualitaetswert 0-100), Anbieterpreise August 2026",
