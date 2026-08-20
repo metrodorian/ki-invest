@@ -1984,10 +1984,26 @@ NAVIGATION = """
   fetch(basis + "index.json", { cache: "no-store" })
     .then(function (a) { return a.json(); })
     .then(function (liste) {
-      if (!liste || liste.length < 2) return;
+      if (!liste || !liste.length) return;
       liste.sort(function (a, b) { return a.datei < b.datei ? 1 : -1; });  // neueste zuerst
-      var hier = liste.findIndex(function (e) { return e.datei === selbst; });
-      if (hier < 0) hier = 0;
+
+      var hier = selbst
+        ? liste.findIndex(function (e) { return e.datei === selbst; })
+        : -1;
+
+      // Die Startseite zwischen zwei Archiveintraegen hat selbst keinen
+      // Dateinamen. Sie wird deshalb als eigener, aktueller Stand vorne
+      // eingereiht - sonst zaehlte die Navigation an ihr vorbei.
+      if (hier < 0) {
+        var jetzt = (wurzel.textContent || "").match(/(\d{2}\.\d{2}\.\d{4}), (\d{2}:\d{2})/);
+        liste.unshift({
+          datei: "",
+          beschriftung: jetzt ? jetzt[1] + ", " + jetzt[2] + " (aktuell)" : "aktuell",
+          barometer: null
+        });
+        hier = 0;
+      }
+      if (liste.length < 2) return;
 
       liste.forEach(function (e, i) {
         var o = document.createElement("option");
@@ -1999,13 +2015,17 @@ NAVIGATION = """
 
       function hin(i) {
         if (i < 0 || i >= liste.length) return;
-        location.href = basis + liste[i].datei;
+        var ziel = liste[i].datei;
+        location.href = ziel ? basis + ziel : (basis ? "./" : "index.html");
       }
       zurueck.disabled = hier >= liste.length - 1;   // links = aelter
       vor.disabled = hier <= 0;                      // rechts = neuer
       zurueck.onclick = function () { hin(hier + 1); };
       vor.onclick = function () { hin(hier - 1); };
-      auswahl.onchange = function () { location.href = basis + auswahl.value; };
+      auswahl.onchange = function () {
+        var ziel = auswahl.value;
+        location.href = ziel ? basis + ziel : (basis ? "./" : "index.html");
+      };
       stelle.textContent = (hier + 1) + " von " + liste.length;
       document.addEventListener("keydown", function (e) {
         if (e.target.tagName === "SELECT") return;
@@ -2879,7 +2899,21 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
                                       nachrichten, regierung, blogs, sec)
 
     if mit_claude:
-        claude_sichern(claude_urteil)
+        if claude_urteil and not claude_urteil.get("fehler"):
+            claude_sichern(claude_urteil)
+        else:
+            # Scheitert der Aufruf, bleibt die letzte brauchbare Einordnung
+            # stehen. Eine Fehlermeldung anstelle einer Einschaetzung waere
+            # schlechter als eine etwas aeltere Einschaetzung.
+            vorherige = claude_letzte()
+            if vorherige:
+                grund = (claude_urteil or {}).get("fehler", "unbekannt")
+                log_schreiben("Claude fehlgeschlagen (%s), behalte Einordnung "
+                              "von %s" % (str(grund)[:70],
+                                          vorherige.get("_stand", "?")))
+                vorherige = dict(vorherige)
+                vorherige["_letzter_versuch"] = datetime.now().strftime("%H:%M")
+                claude_urteil = vorherige
 
     alarme = alarme_sammeln(konfig, positionen, gute_kurse, indikatoren,
                             nachrichten, regierung, sec)
@@ -3545,14 +3579,18 @@ def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None,
                       fuer_mail=False, nur_web=False):
     konfig["_verworfen"] = d.get("verworfen", 0)
     archiv_name = datetime.now().strftime("%Y-%m-%d-%H%M.html")
+    # Zwischenlaeufe schreiben keinen Archiveintrag. Wuerde die Startseite
+    # trotzdem einen Dateinamen nennen, faende sich die Navigation nicht in
+    # ihrer eigenen Liste wieder und zaehlte falsch.
+    eigene_datei = "" if nur_web else archiv_name
 
-    def bauen(mailfassung, basis=""):
+    def bauen(mailfassung, basis="", datei=None):
         return bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
                              d["indikatoren"], d["barometer"], d["nachrichten"],
                              d["regierung"], d["blogs"], d["sec"], d["alarme"],
                              d.get("claude"), d["fehler"], d.get("zusammenfassung"),
                              barometer_verlauf, mailfassung,
-                             archiv_name, basis)
+                             archiv_name if datei is None else datei, basis)
 
     html = bauen(False)
     if konfig.get("mail", {}).get("aktiv"):
@@ -3572,7 +3610,7 @@ def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None,
             os.makedirs(archiv, exist_ok=True)
 
             with open(ziel, "w") as f:
-                f.write(bauen(False, "archiv/"))
+                f.write(bauen(False, "archiv/", eigene_datei))
 
             # Zwischenlaeufe aktualisieren nur die Startseite. Ein Archiveintrag
             # entsteht stuendlich beziehungsweise beim Tagesbericht.
