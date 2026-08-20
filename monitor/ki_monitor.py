@@ -1409,20 +1409,52 @@ def kernbox(indikatoren, gruppen_ansicht):
     return "".join(t)
 
 
-def barometer_verlauf_balken(verlauf):
-    """Balkenreihe der letzten Barometer-Staende. Der Trend sagt mehr als der Stand."""
+def barometer_verlauf_balken(verlauf, breite=232, hoehe=54):
+    """
+    Verlauf des Barometers als Abweichung von der Mitte.
+
+    Balken, die von unten wachsen, machen 60 und 68 ununterscheidbar und
+    verstecken die eigentliche Aussage. Deshalb haengen sie hier an der
+    Linie 50: nach oben heisst fuer die These, nach unten dagegen. Der
+    Umschwung wird damit sichtbar statt nur die Faerbung.
+    """
     if not verlauf or len(verlauf) < 2:
         return ""
-    balken = []
-    for i, eintrag in enumerate(verlauf[-24:]):
-        wert = eintrag.get("wert", 50)
-        hoehe = max(3, int(round(wert / 100.0 * 30)))
-        klasse = "hoch" if wert >= 56 else ("tief" if wert <= 44 else "")
-        if i == len(verlauf[-24:]) - 1:
-            klasse += " jetzt"
-        balken.append('<i class="%s" style="height:%dpx" title="%s: %d"></i>'
-                      % (klasse.strip(), hoehe, eintrag.get("datum", ""), wert))
-    return '<div class="verlauf">%s</div>' % "".join(balken)
+
+    # Je Tag nur der letzte Stand, sonst verzerren mehrere Laeufe das Bild
+    je_tag = {}
+    for e in verlauf:
+        je_tag[e.get("datum", "")] = e.get("wert", 50)
+    punkte = list(je_tag.items())[-30:]
+    if len(punkte) < 2:
+        return ""
+
+    mitte = hoehe / 2.0
+    luecke = 2.0
+    breite_balken = max(3.0, (breite - luecke * (len(punkte) - 1)) / len(punkte))
+
+    t = ['<svg class="baroverlauf" viewBox="0 0 %d %d" width="%d" height="%d">'
+         % (breite, hoehe, breite, hoehe)]
+    t.append('<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--rand)" '
+             'stroke-width="1"/>' % (mitte, breite, mitte))
+
+    for i, (tag, wert) in enumerate(punkte):
+        x = i * (breite_balken + luecke)
+        abweichung = (wert - 50) / 50.0                      # -1 bis +1
+        laenge = max(1.5, abs(abweichung) * (mitte - 3))
+        y = mitte - laenge if abweichung >= 0 else mitte
+        farbe = "var(--gut)" if abweichung >= 0 else "var(--schlecht)"
+        deckung = ".45" if i < len(punkte) - 1 else "1"
+        t.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="1.5" '
+                 'fill="%s" opacity="%s"><title>%s: %d</title></rect>'
+                 % (x, y, breite_balken, laenge, farbe, deckung, tag, wert))
+
+    t.append('<text x="0" y="%d" font-size="9" fill="var(--gedaempft)">%s</text>'
+             % (hoehe - 1, punkte[0][0]))
+    t.append('<text x="%d" y="%d" font-size="9" fill="var(--gedaempft)" '
+             'text-anchor="end">heute</text>' % (breite, hoehe - 1))
+    t.append("</svg>")
+    return "".join(t)
 
 
 def klasse_fuer(wert, invertiert=False):
@@ -1568,11 +1600,7 @@ ul.liste li:last-child{border-bottom:none}
 .neu{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;
  text-transform:uppercase;background:var(--akzent);color:#fff;border-radius:3px;
  padding:1px 5px;margin-right:6px;vertical-align:1px}
-.verlauf{display:flex;align-items:flex-end;gap:2px;height:30px;margin-top:2px}
-.verlauf i{width:5px;border-radius:1px;background:var(--rand);display:block}
-.verlauf i.hoch{background:var(--gut)}
-.verlauf i.tief{background:var(--schlecht)}
-.verlauf i.jetzt{outline:1.5px solid var(--text);outline-offset:1px}
+.baroverlauf{display:block;overflow:visible}
 @media(max-width:640px){
  body{padding:18px 12px 50px}
  .baro{flex-wrap:wrap;gap:12px}
