@@ -706,13 +706,72 @@ def yahoo_news(ticker, kennung, maximal=8):
     return eintraege
 
 
+SEC_PUNKTE = {
+    "1.01": ("Wesentliche Vereinbarung geschlossen", True),
+    "1.02": ("Wesentliche Vereinbarung beendet", True),
+    "1.03": ("Insolvenzverfahren", True),
+    "2.01": ("Erwerb oder Veraeusserung von Vermoegen", True),
+    "2.02": ("Quartals- oder Jahreszahlen", True),
+    "2.03": ("Neue Finanzverbindlichkeit", True),
+    "2.04": ("Verbindlichkeit faellig gestellt", True),
+    "2.05": ("Restrukturierungskosten beschlossen", True),
+    "2.06": ("Ausserplanmaessige Abschreibung", True),
+    "3.01": ("Hinweis auf Delisting", True),
+    "3.02": ("Aktien ausserhalb der Boerse ausgegeben", False),
+    "4.01": ("Wechsel des Abschlusspruefers", True),
+    "4.02": ("Fruehere Abschluesse nicht verlaesslich", True),
+    "5.02": ("Wechsel im Vorstand oder Aufsichtsrat", False),
+    "5.03": ("Satzungsaenderung", False),
+    "5.07": ("Ergebnisse der Hauptversammlung", False),
+    "7.01": ("Freiwillige Mitteilung", False),
+    "8.01": ("Sonstiges Ereignis", False),
+    "9.01": ("Finanzberichte und Anlagen", False),
+}
+
+
 def sec_meldungen(cik, name, kennung, maximal=6):
-    """8-K-Meldungen einer Firma ueber den EDGAR-Atom-Feed."""
-    url = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s"
-           "&type=8-K&dateb=&owner=include&count=%d&output=atom" % (cik, maximal))
-    eintraege = rss_lesen(url, kennung, "SEC / " + name, maximal)
-    for e in eintraege:
-        e["firma"] = name
+    """
+    Ad-hoc-Pflichtmeldungen einer Firma, aufgeschluesselt nach Punktnummern.
+
+    Der Atom-Feed liefert nur die immer gleiche Zeile "8-K - Current report".
+    Die Einreichungs-Schnittstelle nennt dagegen die Punkte, und die verraten,
+    worum es geht: 2.03 ist eine neue Finanzverbindlichkeit, 2.06 eine
+    ausserplanmaessige Abschreibung, 2.02 sind Zahlen. Ohne das steht die
+    Meldung blind im Bericht.
+    """
+    url = "https://data.sec.gov/submissions/CIK%010d.json" % int(cik)
+    try:
+        daten = json.loads(abrufen(url, kennung, versuche=2).decode("utf-8"))
+    except Exception:                                            # noqa: BLE001
+        return []
+
+    j = daten.get("filings", {}).get("recent", {})
+    formulare = j.get("form", [])
+    eintraege = []
+    for i, form in enumerate(formulare):
+        if form != "8-K":
+            continue
+        punkte = [p.strip() for p in (j.get("items", [""] * len(formulare))[i] or "").split(",") if p.strip()]
+        beschreibungen, wichtig = [], False
+        for punkt in punkte:
+            text, zaehlt = SEC_PUNKTE.get(punkt, ("Punkt " + punkt, False))
+            beschreibungen.append(text)
+            wichtig = wichtig or zaehlt
+        akz = (j.get("accessionNumber", [""] * len(formulare))[i] or "").replace("-", "")
+        dok = j.get("primaryDocument", [""] * len(formulare))[i] or ""
+        eintraege.append({
+            "quelle": "SEC / " + name,
+            "firma": name,
+            "titel": "%s: %s" % (name, ", ".join(beschreibungen) or "8-K"),
+            "datum": j.get("filingDate", [""] * len(formulare))[i],
+            "punkte": punkte,
+            "wichtig": wichtig,
+            "link": ("https://www.sec.gov/Archives/edgar/data/%s/%s/%s"
+                     % (int(cik), akz, dok)) if akz and dok else "",
+            "auszug": "",
+        })
+        if len(eintraege) >= maximal:
+            break
     return eintraege
 
 
@@ -856,7 +915,11 @@ Regierungsvorhaben:
 Veroeffentlichungen der KI-Labore:
 %s
 
-SEC-Meldungen (8-K):
+SEC-Pflichtmeldungen (8-K), nach Punktnummern aufgeschluesselt.
+Wesentlich sind vor allem: 1.01 Vereinbarung, 2.02 Zahlen, 2.03 neue
+Finanzverbindlichkeit, 2.06 ausserplanmaessige Abschreibung. Eine neue
+Finanzverbindlichkeit bei einem Chiphersteller kann Zirkelfinanzierung sein -
+schau dort genauer hin und recherchiere bei Bedarf, worum es geht.
 %s
 
 ZWEI CHINA-MASSE, DIE VERSCHIEDENES MESSEN
@@ -971,7 +1034,9 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
         zeilen(blogs, 10, lambda b: "  [%s] %s" % (b["quelle"], b["titel"][:150])),
-        zeilen(sec, 8, lambda s: "  %s: %s" % (s.get("firma", ""), s["titel"][:120])),
+        zeilen(sec, 10, lambda s: "  %s %s%s" % (
+            s.get("datum", ""), s["titel"][:130],
+            "  <-- wesentlich" if s.get("wichtig") else "")),
     )
 
     # Nur Websuche und Seitenabruf sind erlaubt und damit vorab genehmigt.
@@ -1088,8 +1153,13 @@ def alarme_sammeln(konfig, positionen, kurse, indikatoren, nachrichten,
             alarme.append(("hinweis", "Regierung: %s" % r["titel"][:160]))
 
     for s in sec:
-        alarme.append(("hinweis", "SEC-Meldung %s: %s"
-                       % (s.get("firma", ""), s["titel"][:120])))
+        if not s.get("wichtig"):
+            continue          # Hauptversammlung, Anlagenverzeichnis und
+                              # freiwillige Mitteilungen sind kein Ereignis
+        alarme.append(("alarm" if any(p in ("2.02", "2.03", "2.06", "1.03", "4.02")
+                                      for p in s.get("punkte", []))
+                       else "hinweis",
+                       "SEC-Pflichtmeldung &ndash; %s" % s["titel"][:140]))
 
     heute = date.today()
     for termin in konfig.get("termine", []):
@@ -1241,14 +1311,27 @@ def positionswert_verlauf(position, kurs, devisen=None):
         wert = schein[i] * einstand * stueck
         if fx_anker and fx.get(d):
             wert *= fx_anker / fx[d]
-        wert *= (1.0 - spanne)          # Geldkurs statt Briefkurs
+        # Der Einstiegstag steht auf dem tatsaechlich bezahlten Briefkurs.
+        # Erst danach wird zum Geldkurs bewertet, so wie das Depot es tut -
+        # der Absatz gleich hinter dem Einstieg ist die Handelsspanne.
+        if i > anker_index:
+            wert *= (1.0 - spanne)
         punkte.append({"datum": d, "wert": max(0.0, wert), "vor_einstieg": i < anker_index})
 
-    # Falls ein tatsaechlicher Scheinkurs hinterlegt ist, hat er Vorrang
+    # Falls ein tatsaechlicher Scheinkurs vorliegt, hat er Vorrang fuer den
+    # aktuellen Stand. Am Kauftag faellt der Einstieg auf denselben Tag wie
+    # der Ist-Kurs - dann wird ein zusaetzlicher Punkt angehaengt, damit der
+    # Einstieg auf dem bezahlten Kurs stehen bleibt und die Spanne sichtbar
+    # wird, statt den Ankerpunkt zu ueberschreiben.
     ist_kurs = position.get("kurs_aktuell")
     if ist_kurs:
-        punkte[-1]["wert"] = ist_kurs * stueck
-        punkte[-1]["gemessen"] = True
+        if anker_index == len(punkte) - 1:
+            punkte.append({"datum": punkte[-1]["datum"],
+                           "wert": ist_kurs * stueck,
+                           "vor_einstieg": False, "gemessen": True})
+        else:
+            punkte[-1]["wert"] = ist_kurs * stueck
+            punkte[-1]["gemessen"] = True
 
     # Der Vorlauf dient nur der Einordnung. Er wird gekuerzt, damit die Zeit
     # seit dem Einstieg den Graphen bestimmt und nicht die Vorgeschichte.
@@ -1385,13 +1468,14 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
                     gv / gesamt_ein * 100))
 
     return ('<div class="wertkarte">%s<div class="legende">%s</div>'
-            '<div class="klein">Gezeigt wird der <b>Geldkurs</b> &ndash; der Wert, '
-            'den auch dein Depot ausweist. Die waagerechte Linie je Farbe ist der '
-            'bezahlte Briefkurs; der Abstand zur Kurve am Einstieg ist die '
-            'Handelsspanne. Gestrichelt vor dem Einstieg: rechnerischer Verlauf, '
-            'nicht dein tatsaechlicher. %s Zwischenwerte sind aus der Tagesbewegung '
-            'des Basiswerts mal Faktor und dem Wechselkurs EUR/USD gerechnet '
-            '(beide Scheine sind nicht waehrungsgesichert).</div></div>'
+            '<div class="klein">Der Einstiegspunkt liegt auf dem <b>tatsaechlich '
+            'bezahlten Kurs</b>, die waagerechte Linie je Farbe ebenfalls. Ab dem '
+            'Tag danach wird zum <b>Geldkurs</b> bewertet, so wie das Depot es tut '
+            '&ndash; der Absatz gleich hinter dem Einstieg ist die Handelsspanne. '
+            'Gestrichelt vor dem Einstieg: rechnerischer Verlauf, nicht dein '
+            'tatsaechlicher. %s Zwischenwerte sind aus der Tagesbewegung des '
+            'Basiswerts mal Faktor und dem Wechselkurs EUR/USD gerechnet (beide '
+            'Scheine sind nicht waehrungsgesichert).</div></div>'
             % ("".join(t), " ".join(beine),
                ("Der aktuelle Punkt stammt aus <b>abgerufenen Ist-Kursen</b> "
                 "(Quotierung des Emittenten, wie im ING-Direkthandel)."
@@ -1679,6 +1763,54 @@ def kernbox(indikatoren, gruppen_ansicht, mit_steuerung=True):
         t.append(STEUERUNG)      # in der Mail waeren die Knoepfe wirkungslos
     t.append("</aside>")
     return "".join(t)
+
+
+AUFFRISCHEN = """
+<script>
+(function () {
+  // Die Seite wird alle zehn Minuten neu geschrieben. Statt manuell neu zu
+  // laden, horcht sie auf den Bauzeitpunkt und holt sich die neue Fassung
+  // selbst - aber nur, wenn sie gerade niemand benutzt.
+  var eigener = null;
+  var ORT = "ki-invest-scrollstand";
+
+  var gemerkt = sessionStorage.getItem(ORT);
+  if (gemerkt !== null) {
+    sessionStorage.removeItem(ORT);
+    window.addEventListener("load", function () {
+      window.scrollTo(0, parseInt(gemerkt, 10) || 0);
+    });
+  }
+
+  function stoert() {
+    var fenster = document.getElementById("mehrfenster");
+    if (fenster && fenster.open) { return true; }          // Fenster ist auf
+    var a = document.activeElement;
+    if (a && (a.tagName === "INPUT" || a.tagName === "SELECT")) { return true; }
+    var leiste = document.getElementById("alarmleiste");
+    if (leiste && !leiste.hidden) { return true; }          // Alarm sichtbar
+    return false;
+  }
+
+  function pruefen() {
+    fetch("/aktion/stand", { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) {
+        if (!z || !z.stand) { return; }
+        if (eigener === null) { eigener = z.stand; return; }
+        if (z.stand !== eigener && !stoert()) {
+          sessionStorage.setItem(ORT, String(window.scrollY));
+          location.reload();
+        }
+      })
+      .catch(function () { /* ohne Server bleibt die Seite stehen */ });
+  }
+
+  pruefen();
+  setInterval(pruefen, 20000);
+})();
+</script>
+"""
 
 
 ALARMSCHALTER = """
@@ -2108,6 +2240,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                 "" if fuer_mail else NAVIGATION))
     if not fuer_mail:
         t.append(ALARMSCHALTER)
+        t.append(AUFFRISCHEN)
 
     # ---- Barometer
     wert, lage = barometer
@@ -2450,11 +2583,13 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              'Hier taucht Wesentliches auf, bevor es in den Nachrichten steht.</div>')
     if not sec:
         t.append('<div class="karte klein">Keine aktuellen 8-K-Meldungen.</div>')
-    for s in sec[:12]:
-        t.append('<div class="karte"><a href="%s">%s</a><div class="klein">'
-                 '%s &middot; %s</div></div>'
-                 % (html_schuetzen(s.get("link", "")), html_schuetzen(s["titel"]),
-                    html_schuetzen(s.get("firma", "")), html_schuetzen(s.get("datum", ""))))
+    for s in sec[:14]:
+        t.append('<div class="karte %s"><a href="%s">%s</a><div class="klein">'
+                 '%s &middot; Punkte %s</div></div>'
+                 % ("hinweis" if s.get("wichtig") else "",
+                    html_schuetzen(s.get("link", "")), html_schuetzen(s["titel"]),
+                    html_schuetzen(s.get("datum", "")),
+                    html_schuetzen(", ".join(s.get("punkte", [])) or "-")))
 
     # ---- Termine
     t.append("<h2>Termine</h2><ul class='liste'>")

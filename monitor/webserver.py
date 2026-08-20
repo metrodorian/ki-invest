@@ -166,6 +166,16 @@ class Handler(SimpleHTTPRequestHandler):
                  "geschlossen": bool(p.get("geschlossen"))}
                 for p in konfig.get("positionen", [])]})
 
+        if was == "stand":
+            # Bauzeitpunkt der Startseite. Die Seite vergleicht ihn mit dem
+            # eigenen und laedt neu, sobald ein Lauf eine neue Fassung
+            # geschrieben hat.
+            try:
+                return self.antwort({"stand": int(os.path.getmtime(
+                    os.path.join(WEB, "index.html")))})
+            except OSError:
+                return self.antwort({"stand": 0})
+
         if was == "zustand":
             ruhe = ruhe_aktiv(konfig)
             notiz = konfig.get("notiz") or {}
