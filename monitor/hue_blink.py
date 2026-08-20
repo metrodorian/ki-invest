@@ -26,7 +26,7 @@ STOPP = os.path.join(BASIS, "blink.stopp")
 LAEUFT = os.path.join(BASIS, "blink.laeuft")
 ALARMTEXT = os.path.join(BASIS, "alarm.txt")
 TAKT = 5.0
-HOECHSTDAUER = 36 * 3600         # Sicherheitsnetz, falls niemand abstellt
+HOECHSTDAUER = 24 * 3600         # Sicherheitsnetz, falls niemand abstellt
 
 # Nachtruhe: In diesem Fenster blinkt die Lampe nur ein begrenztes Kontingent
 # und schweigt danach bis zum Morgen. Der Alarm bleibt aber bestehen und
@@ -53,6 +53,56 @@ def hue_kontext():
     k.check_hostname = False
     k.verify_mode = ssl.CERT_NONE
     return k
+
+
+def telegram_zugang(konfig):
+    einst = konfig.get("telegram", {})
+    if not einst.get("aktiv"):
+        return None, None
+
+    def lesen(wert, datei):
+        if wert:
+            return wert
+        if datei and os.path.exists(datei):
+            return open(datei).read().strip()
+        return None
+
+    return (lesen(einst.get("token"), einst.get("token_datei")),
+            lesen(einst.get("chat"), einst.get("chat_datei")))
+
+
+def telegram_abruf(token, offset):
+    """Holt neue Nachrichten an den Bot. Ohne Wartezeit, damit die Schleife
+    nicht haengt."""
+    url = ("https://api.telegram.org/bot%s/getUpdates?timeout=0&offset=%d"
+           % (token, offset))
+    try:
+        with urllib.request.urlopen(url, timeout=8) as antwort:
+            return json.loads(antwort.read()).get("result", [])
+    except Exception:                                            # noqa: BLE001
+        return []
+
+
+def stopp_per_telegram(konfig, offset):
+    """
+    Prueft, ob per Telegram 'stop' geschrieben wurde.
+
+    Gibt den neuen Offset zurueck und ob abgebrochen werden soll. So laesst
+    sich der Alarm auch dann beenden, wenn man die Weboberflaeche gerade
+    nicht erreicht - unterwegs etwa.
+    """
+    token, chat = telegram_zugang(konfig)
+    if not token:
+        return offset, False
+
+    abbrechen = False
+    for u in telegram_abruf(token, offset):
+        offset = max(offset, u.get("update_id", 0) + 1)
+        nachricht = u.get("message") or u.get("edited_message") or {}
+        text = (nachricht.get("text") or "").strip().lower()
+        if text.startswith("stop") or text in ("/stop", "aus", "halt"):
+            abbrechen = True
+    return offset, abbrechen
 
 
 def telegram_erinnerung(konfig, text, nummer):
@@ -139,6 +189,14 @@ def main():
     alarmtext = ""
     if os.path.exists(ALARMTEXT):
         alarmtext = open(ALARMTEXT).read().strip()[:400]
+
+    # Ausgangsstand der Telegram-Nachrichten merken, damit ein altes "stop"
+    # aus dem Verlauf den frischen Alarm nicht sofort beendet.
+    telegram_offset = 0
+    token_start, _ = telegram_zugang(konfig)
+    if token_start:
+        for u in telegram_abruf(token_start, 0):
+            telegram_offset = max(telegram_offset, u.get("update_id", 0) + 1)
     telegram_takt = einst.get("telegram_takt_sekunden", 5)
     naechste_meldung = 0.0
     meldungen = 0
@@ -186,6 +244,24 @@ def main():
                 meldungen += 1
                 telegram_erinnerung(konfig, alarmtext, meldungen)
                 naechste_meldung = time.time() + telegram_takt
+
+            telegram_offset, abbrechen = stopp_per_telegram(konfig, telegram_offset)
+            if abbrechen:
+                telegram_erinnerung.zuletzt = None
+                open(STOPP, "w").close()
+                token, chat = telegram_zugang(konfig)
+                if token and chat:
+                    daten = urllib.parse.urlencode(
+                        {"chat_id": chat,
+                         "text": "Alarm beendet. Die Lampe geht zurueck in ihren "
+                                 "vorherigen Zustand."}).encode()
+                    try:
+                        urllib.request.urlopen(
+                            "https://api.telegram.org/bot%s/sendMessage" % token,
+                            data=daten, timeout=8).read()
+                    except Exception:                            # noqa: BLE001
+                        pass
+                break
 
             warten(TAKT)
     finally:

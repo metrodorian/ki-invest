@@ -41,6 +41,7 @@ BASIS = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PFAD = os.path.join(BASIS, "config.json")
 STATE_PFAD = os.path.join(BASIS, "state.json")
 DATEN_PFAD = os.path.join(BASIS, "daten.json")
+CLAUDE_PFAD = os.path.join(BASIS, "claude.json")
 BERICHT_PFAD = os.path.join(BASIS, "bericht.html")
 LOG_PFAD = os.path.join(BASIS, "monitor.log")
 
@@ -1477,19 +1478,27 @@ ALARMSCHALTER = """
       .then(function (z) { leiste.hidden = !z.blinkt; })
       .catch(function () { leiste.hidden = true; });
   }
+  var erledigt = false;
   knopf.onclick = function () {
     knopf.disabled = true;
     knopf.textContent = "wird abgestellt \u2026";
-    fetch("/blink/stopp", { cache: "no-store" }).finally(function () {
-      setTimeout(function () {
-        leiste.hidden = true;
+    fetch("/blink/stopp", { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) {
+        erledigt = true;
+        leiste.className = "alarmleiste erledigt";
+        leiste.innerHTML = '<span class="haken">\u2713</span>' +
+          '<span class="alarmtext"><b>Alarm abgestellt.</b> ' +
+          'Die Lampe geht in ihren vorherigen Zustand zurueck.</span>';
+        setTimeout(function () { leiste.hidden = true; erledigt = false; }, 12000);
+      })
+      .catch(function () {
         knopf.disabled = false;
         knopf.textContent = "Alarm abstellen";
-      }, 1200);
-    });
+      });
   };
   pruefen();
-  setInterval(pruefen, 10000);
+  setInterval(function () { if (!erledigt) { pruefen(); } }, 10000);
 })();
 </script>
 """
@@ -1656,6 +1665,10 @@ h3{font-size:14px;margin:20px 0 8px;font-weight:600}
  color:var(--text);border:1px solid var(--rand);border-radius:7px;padding:4px 8px;
  max-width:260px}
 .blaettern .stelle{font-size:11.5px;color:var(--gedaempft);white-space:nowrap}
+/* Das Attribut "hidden" wirkt ueber die eingebaute Regel [hidden]{display:none}.
+   Eine Klassenregel mit display waere staerker und wuerde sie aushebeln -
+   deshalb hier ausdruecklich nachziehen. */
+.alarmleiste[hidden], .blaettern[hidden]{display:none !important}
 .alarmleiste{display:flex;align-items:center;gap:12px;background:#b91c1c;
  color:#fff;border-radius:11px;padding:13px 17px;margin:14px 0 4px;
  font-size:14px;box-shadow:0 2px 10px rgba(185,28,28,.3)}
@@ -1666,6 +1679,8 @@ h3{font-size:14px;margin:20px 0 8px;font-weight:600}
 .alarmleiste button:disabled{opacity:.6;cursor:default}
 .puls{width:11px;height:11px;border-radius:50%;background:#fff;flex:none;
  animation:pulsieren 1.1s ease-in-out infinite}
+.alarmleiste.erledigt{background:#15803d;box-shadow:0 2px 10px rgba(21,128,61,.28)}
+.alarmleiste.erledigt .haken{font-size:17px;font-weight:700;flex:none}
 @keyframes pulsieren{0%,100%{opacity:1}50%{opacity:.25}}
 table{width:100%;border-collapse:collapse;font-size:14px;background:var(--flaeche);
  border-radius:10px;overflow:hidden;box-shadow:var(--schatten)}
@@ -1760,6 +1775,12 @@ ul.liste li:last-child{border-bottom:none}
 .alt{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
  background:var(--flaeche2);color:var(--gedaempft);border-radius:3px;
  padding:1px 5px;margin-right:6px;font-weight:600}
+.notiz{background:var(--flaeche2);border-left:4px solid var(--akzent);
+ border-radius:9px;padding:12px 16px;margin:14px 0 4px;font-size:14px;
+ line-height:1.55}
+.ruhehinweis{background:var(--flaeche2);border:1px dashed var(--gedaempft);
+ border-radius:9px;padding:10px 15px;margin:14px 0 4px;font-size:13px;
+ color:var(--gedaempft)}
 .warnfeld{background:var(--flaeche2);border:1px dashed var(--warn);
  border-radius:10px;padding:11px 15px;margin-bottom:10px;font-size:12.5px;
  color:var(--gedaempft);line-height:1.5}
@@ -1832,6 +1853,24 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  'style="margin-bottom:3px">Verlauf</div>%s</div>' % balken)
                 if balken else ""))
 
+    # ---- Hinweis auf eine laufende Stummschaltung
+    if ruhe_aktiv(konfig):
+        try:
+            bis = datetime.fromisoformat(konfig["ruhe_bis"])
+            t.append('<div class="ruhehinweis">Alarme sind bis <b>%s Uhr</b> '
+                     'stummgeschaltet. Die Ueberwachung laeuft weiter.</div>'
+                     % bis.strftime("%d.%m., %H:%M"))
+        except (TypeError, ValueError):
+            pass
+
+    # ---- Vermerk, falls einer gesetzt ist
+    notiz = konfig.get("notiz")
+    if isinstance(notiz, dict) and notiz.get("text"):
+        t.append('<div class="notiz"><b>Vermerk</b> &middot; '
+                 '<span class="klein">seit %s</span><br>%s</div>'
+                 % (html_schuetzen(notiz.get("seit", "")),
+                    html_schuetzen(notiz["text"])))
+
     # ---- Wertverlauf der Positionen
     grafik = wertverlauf_grafik([p.get("wertverlauf") for p in positionen])
     if grafik:
@@ -1853,8 +1892,10 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         if claude_saetze:
             for satz in claude_saetze:
                 t.append("<p>%s</p>" % html_schuetzen(satz))
-            t.append('<div class="quelle">Einordnung von Claude &middot; '
-                     'die gemessenen Werte darunter</div>')
+            t.append('<div class="quelle">Einordnung von Claude%s &middot; '
+                     'die gemessenen Werte darunter</div>'
+                     % (" von " + html_schuetzen(claude_urteil["_stand"])
+                        if claude_urteil.get("_stand") else ""))
         for satz in (zusammenfassung or []):
             t.append('<p class="%s">%s</p>'
                      % ("gemessen" if claude_saetze else "", satz))
@@ -1872,7 +1913,12 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
             status = claude_urteil.get("these_status", "neutral")
             bedarf = claude_urteil.get("handlungsbedarf", "keiner")
             klasse = {"bestaetigt": "gut", "gefaehrdet": "schlecht"}.get(status, "neutral")
+            stand = claude_urteil.get("_stand")
             t.append('<div class="claude">')
+            if stand:
+                t.append('<div class="klein" style="margin:0 0 9px">'
+                         'Einordnung von %s. Die Messwerte darueber sind aktuell.'
+                         '</div>' % html_schuetzen(stand))
             t.append('<div style="margin:0 0 10px"><span class="marke %s">These %s</span> '
                      '<span class="marke %s">Handlungsbedarf: %s</span></div>'
                      % (klasse, html_schuetzen(status),
@@ -2193,6 +2239,8 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
 
     positionen = []
     for pos in konfig.get("positionen", []):
+        if pos.get("geschlossen"):
+            continue                      # als verkauft markiert
         daten = hole(pos["ticker"])
         if daten.get("fehler"):
             fehler.append("Position %s ohne Kurs" % pos.get("name", "?"))
@@ -2284,9 +2332,14 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         konfig, vorheriges_barometer)
 
     claude_urteil = None
+    if not mit_claude:
+        claude_urteil = claude_letzte()      # letzte Einordnung weiterverwenden
     if mit_claude:
         claude_urteil = claude_fragen(konfig, positionen, indikatoren, barometer,
                                       nachrichten, regierung, blogs, sec)
+
+    if mit_claude:
+        claude_sichern(claude_urteil)
 
     alarme = alarme_sammeln(konfig, positionen, gute_kurse, indikatoren,
                             nachrichten, regierung, sec)
@@ -2611,6 +2664,18 @@ def dauerblinken_starten(alarmtext=""):
         return False
 
 
+def ruhe_aktiv(konfig):
+    """Waehrend der Stummschaltung wird nichts ausgeloest. Die Ueberwachung
+    laeuft weiter, nur Lampe, Telegram und Eilmail schweigen."""
+    bis = konfig.get("ruhe_bis")
+    if not bis:
+        return False
+    try:
+        return datetime.now() < datetime.fromisoformat(bis)
+    except (TypeError, ValueError):
+        return False
+
+
 def eilmeldung_verschicken(konfig, d, zustand):
     """
     Sofortmail bei Ereignissen, die nicht bis zum Abendbericht warten koennen.
@@ -2620,6 +2685,11 @@ def eilmeldung_verschicken(konfig, d, zustand):
     urteil = d.get("claude") or {}
     eil = urteil.get("eilmeldung") or {}
     if not isinstance(eil, dict) or not eil.get("noetig"):
+        return False
+
+    if ruhe_aktiv(konfig):
+        log_schreiben("Eilmeldung unterdrueckt - Ruhezeit bis %s"
+                      % konfig.get("ruhe_bis"))
         return False
 
     einst = konfig.get("mail", {})
@@ -2912,7 +2982,27 @@ def neuheiten_markieren(nachrichten, zustand):
         aktuell + list(bekannt)))[:800]
 
 
-def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None, fuer_mail=False):
+def claude_sichern(urteil):
+    """Legt die letzte brauchbare Einordnung ab, damit die haeufigen
+    Datenlaeufe sie weiterverwenden koennen, ohne Claude zu fragen."""
+    if not urteil or urteil.get("fehler"):
+        return
+    ablage = dict(urteil)
+    ablage["_stand"] = datetime.now().strftime("%d.%m.%Y, %H:%M")
+    ablage["_zeitstempel"] = datetime.now().isoformat(timespec="seconds")
+    json_speichern(CLAUDE_PFAD, ablage)
+
+
+def claude_letzte():
+    """Die zuletzt gesicherte Einordnung, oder nichts."""
+    urteil = json_laden(CLAUDE_PFAD, None)
+    if isinstance(urteil, dict) and not urteil.get("fehler"):
+        return urteil
+    return None
+
+
+def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None,
+                      fuer_mail=False, nur_web=False):
     konfig["_verworfen"] = d.get("verworfen", 0)
     archiv_name = datetime.now().strftime("%Y-%m-%d-%H%M.html")
 
@@ -2941,13 +3031,16 @@ def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None, fuer_mail=Fals
             archiv = os.path.join(web, "archiv")
             os.makedirs(archiv, exist_ok=True)
 
-            with open(os.path.join(archiv, archiv_name), "w") as f:
-                f.write(bauen(False, ""))
             with open(ziel, "w") as f:
                 f.write(bauen(False, "archiv/"))
 
-            verzeichnis_schreiben(archiv, archiv_name, d,
-                                  konfig.get("archiv_hoechstzahl", 90))
+            # Zwischenlaeufe aktualisieren nur die Startseite. Ein Archiveintrag
+            # entsteht stuendlich beziehungsweise beim Tagesbericht.
+            if not nur_web:
+                with open(os.path.join(archiv, archiv_name), "w") as f:
+                    f.write(bauen(False, ""))
+                verzeichnis_schreiben(archiv, archiv_name, d,
+                                      konfig.get("archiv_hoechstzahl", 90))
         except OSError as fehler:
             log_schreiben("Kopie nach %s fehlgeschlagen: %s" % (ziel, fehler))
 
@@ -2983,8 +3076,15 @@ def nur_claude_neu(konfig, oeffnen):
 def main():
     modus = ("nur-claude" if "--nur-claude" in sys.argv
              else "report" if "--report" in sys.argv
+             else "web" if "--web" in sys.argv
              else "test" if "--test" in sys.argv else "watch")
-    mit_claude = "--ohne-claude" not in sys.argv and modus != "watch"
+
+    # Im Web-Modus fragt nur der stuendliche Lauf bei Claude nach. Die
+    # Zwischenlaeufe nehmen die zuletzt gesicherte Einordnung.
+    if modus == "web":
+        mit_claude = "--mit-claude" in sys.argv
+    else:
+        mit_claude = "--ohne-claude" not in sys.argv and modus != "watch"
 
     konfig = json_laden(CONFIG_PFAD, None)
     if konfig is None:
@@ -3031,12 +3131,30 @@ def main():
                                             len(frisch), len(d["fehler"])))
     else:
         verlauf = zustand.get("barometer_verlauf", [])
-        verlauf.append({"datum": date.today().strftime("%d.%m."),
-                        "wert": d["barometer"][0]})
+        heute = date.today().strftime("%d.%m.")
+        if modus == "web" and verlauf and verlauf[-1].get("datum") == heute:
+            verlauf[-1]["wert"] = d["barometer"][0]     # Tageswert fortschreiben
+        else:
+            verlauf.append({"datum": heute, "wert": d["barometer"][0]})
         zustand["barometer_verlauf"] = verlauf[-40:]
         neuheiten_markieren(d["nachrichten"], zustand)
+
+        # Zwischenlaeufe aktualisieren nur die Startseite, kein Archiveintrag
         bericht_schreiben(konfig, d, oeffnen=(modus == "report"),
-                          barometer_verlauf=zustand["barometer_verlauf"])
+                          barometer_verlauf=zustand["barometer_verlauf"],
+                          nur_web=(modus == "web" and not mit_claude))
+
+        if modus == "web":
+            frisch = neue_alarme(d["alarme"], zustand)
+            echte = [t for stufe, t in frisch if stufe == "alarm"]
+            if (echte and mit_claude and d.get("claude")
+                    and not d["claude"].get("fehler")):
+                eilmeldung_verschicken(konfig, d, zustand)
+            log_schreiben("web%s: Barometer %d, %d Auffaelligkeiten (%d neu), "
+                          "%d Nachrichten, %d Abrufprobleme"
+                          % (" mit Claude" if mit_claude else "",
+                             d["barometer"][0], len(d["alarme"]), len(frisch),
+                             len(d["nachrichten"]), len(d["fehler"])))
         # Datenstand sichern, damit --nur-claude ohne erneuten Abruf arbeiten kann
         d["gesammelt_am"] = datetime.now().strftime("%d.%m.%Y %H:%M")
         try:
@@ -3046,7 +3164,12 @@ def main():
         if modus == "report":
             eilmeldung_verschicken(konfig, d, zustand)
             bericht_mailen(konfig, d)
-        zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
+            zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
+        if modus == "web":
+            zustand["letzter_lauf"] = datetime.now().isoformat(timespec="seconds")
+            zustand["letztes_barometer"] = d["barometer"][0]
+            json_speichern(STATE_PFAD, zustand)
+            return 0
         log_schreiben("%s: Barometer %d, %d Auffaelligkeiten, %d Nachrichten, "
                       "%d Abrufprobleme -> %s"
                       % (modus, d["barometer"][0], len(d["alarme"]),

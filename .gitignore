@@ -1,10 +1,12 @@
 monitor/state.json
 monitor/daten.json
+monitor/claude.json
 monitor/bericht.html
 monitor/web/
 monitor/*.log
 monitor/*.token
 monitor/*.key
 monitor/*.chat
+monitor/*.offset
 monitor/alarm.txt
 monitor/blink.*
