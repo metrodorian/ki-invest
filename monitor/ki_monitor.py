@@ -214,27 +214,97 @@ def scheinkurs_holen(isin, kennung):
                               if (geld and brief) else None}
 
 
+def kennzahlen_text(konfig):
+    """
+    Formt die hinterlegten Erwartungswerte als Text: den Analystenkonsens zum
+    naechsten Nvidia-Quartal und die Investitionssumme der grossen
+    Cloud-Anbieter.
+
+    Beides sind Messlatten, keine Kurse. Ohne sie kann niemand - auch claude
+    nicht - beurteilen, ob eine Zahl gut oder schlecht war, denn "Rekordumsatz"
+    heisst nichts, wenn die Erwartung hoeher lag.
+    """
+    k = konfig.get("kennzahlen") or {}
+    n = k.get("nvidia_quartal") or {}
+    h = k.get("hyperscaler_capex") or {}
+    teile = []
+    if n:
+        teile.append(
+            "  %s, Termin %s%s\n"
+            "    Konsens Umsatz %.2f Mrd USD, Gewinn je Aktie %.2f\n"
+            "    Eigene Prognose des Unternehmens %.1f Mrd +/- %d%%\n"
+            "    Rechenzentrum geschaetzt %.1f Mrd (%d%% Anteil, abgeleitet)\n"
+            "    Vorquartal %.1f Mrd, davon Rechenzentrum %.1f Mrd\n"
+            "    KONSENS FUER DAS FOLGEQUARTAL: %.1f Mrd - das ist die "
+            "eigentliche Messlatte.\n"
+            "    Eine Prognose darunter bricht die Wachstumserwartung und "
+            "arbeitet FUER die These."
+            % (n.get("bezeichnung", "Nvidia"), n.get("termin", "?"),
+               " (nach US-Boersenschluss)" if n.get("nach_boersenschluss") else "",
+               n.get("konsens_umsatz_mrd", 0), n.get("konsens_gewinn_je_aktie", 0),
+               n.get("eigene_prognose_mrd", 0), n.get("eigene_prognose_spanne_prozent", 0),
+               n.get("konsens_rechenzentrum_mrd", 0), n.get("rechenzentrum_anteil_prozent", 0),
+               n.get("vorquartal_umsatz_mrd", 0), n.get("vorquartal_rechenzentrum_mrd", 0),
+               n.get("konsens_folgequartal_mrd", 0)))
+    if h:
+        einzeln = h.get("einzeln") or {}
+        teile.append(
+            "  %s, %s: %.1f Mrd USD (%s)\n"
+            "    Vorquartal %.1f Mrd, Wachstum +%d%% zum Vorjahr, +%d%% zum Vorquartal\n"
+            "    Solange diese Summe steigt, arbeitet sie GEGEN die These. Erst ein "
+            "Rueckgang\n    oder eine gesenkte Jahresprognose bricht die Nachfrageseite."
+            % (h.get("bezeichnung", "Cloud-Investitionen"), h.get("quartal", "?"),
+               h.get("summe_mrd", 0),
+               ", ".join("%s %.1f" % (a, v) for a, v in
+                         sorted(einzeln.items(), key=lambda x: -x[1])),
+               h.get("vorquartal_mrd", 0), h.get("vorjahr_wachstum_prozent", 0),
+               h.get("vorquartal_wachstum_prozent", 0)))
+    return "\n\n".join(teile) or "  (keine Erwartungswerte hinterlegt)"
+
+
 def tokenpreise_auswerten(konfig):
     """
-    Verfolgt den Preis je Million Token der guenstigsten Spitzenmodelle.
+    Verfolgt, was Spitzenfaehigkeit je Million Token kostet - getrennt nach
+    Westen und China.
 
-    Das ist der einzige direkte Messwert fuer die Effizienzseite der These:
-    Fallen die Preise schnell, wird Rechenleistung entwertet - und genau
-    darauf setzt die Wette. Alles andere misst Effizienz nur ueber den Umweg
-    von Aktienkursen, also gar nicht.
+    Das ist der einzige direkte Messwert fuer die Effizienzseite der These.
+    Entscheidend ist nicht der Preis des billigsten Modells, sondern der Preis
+    bei gleicher Faehigkeit: Wenn ein chinesisches Modell auf demselben
+    Qualitaetsrang ein Zehntel kostet, ist die teure westliche Rechenleistung
+    genau in dem Mass entwertet.
 
-    Bei jeder Preisaenderung wird der alte Stand fortgeschrieben, sodass
-    ueber die Wochen eine Zeitreihe entsteht.
+    Die Modelle stehen nach Faehigkeit sortiert in der Konfiguration. Modelle
+    ohne ermittelten Preis bleiben in der Liste sichtbar, zaehlen aber nicht
+    in die Rechnung.
     """
     einst = konfig.get("tokenpreise") or {}
     modelle = einst.get("modelle") or []
-    spitze = [m for m in modelle if m.get("spitzenklasse")]
-    if not spitze:
+    # Nach Faehigkeit sortiert halten, egal wie die Datei gepflegt wurde.
+    modelle = sorted(modelle, key=lambda m: (-(m.get("faehigkeit") or 0),
+                                             m.get("rang") or 999))
+    mit_preis = [m for m in modelle if m.get("ausgabe")]
+    if not mit_preis:
         return None
 
-    schnitt_ein = sum(m["eingabe"] for m in spitze) / len(spitze)
-    schnitt_aus = sum(m["ausgabe"] for m in spitze) / len(spitze)
-    guenstigstes = min(spitze, key=lambda m: m["ausgabe"])
+    # "Gleiche Liga" ist die Spitzengruppe: alles, was hoechstens drei Punkte
+    # unter dem besten Qualitaetswert liegt.
+    bestwert = max(m.get("faehigkeit") or 0 for m in mit_preis)
+    liga = [m for m in mit_preis if (m.get("faehigkeit") or 0) >= bestwert - 3]
+    liga_us = [m for m in liga if m.get("land") != "CN"]
+    liga_cn = [m for m in liga if m.get("land") == "CN"]
+
+    def schnitt(gruppe, feld):
+        werte = [m[feld] for m in gruppe if m.get(feld)]
+        return (sum(werte) / len(werte)) if werte else None
+
+    preis_us = schnitt(liga_us, "ausgabe")
+    preis_cn = schnitt(liga_cn, "ausgabe")
+    luecke = (preis_us / preis_cn) if (preis_us and preis_cn) else None
+
+    # Bestes chinesisches Modell ueberhaupt - der eigentliche Aufholmesswert.
+    cn_alle = [m for m in mit_preis if m.get("land") == "CN"]
+    bestes_cn = max(cn_alle, key=lambda m: m.get("faehigkeit") or 0) if cn_alle else None
+    guenstigstes = min(mit_preis, key=lambda m: m["ausgabe"])
 
     verlauf = json_laden(TOKEN_PFAD, [])
     if not isinstance(verlauf, list):
@@ -242,19 +312,26 @@ def tokenpreise_auswerten(konfig):
 
     jetzt = {
         "datum": date.today().isoformat(),
-        "schnitt_eingabe": round(schnitt_ein, 4),
-        "schnitt_ausgabe": round(schnitt_aus, 4),
+        "schnitt_eingabe": round(schnitt(liga, "eingabe") or 0, 4),
+        "schnitt_ausgabe": round(schnitt(liga, "ausgabe") or 0, 4),
+        "preis_us": round(preis_us, 4) if preis_us else None,
+        "preis_cn": round(preis_cn, 4) if preis_cn else None,
+        "luecke": round(luecke, 2) if luecke else None,
+        "bester_cn_rang": bestes_cn.get("faehigkeit") if bestes_cn else None,
+        "bester_cn": ("%s %s" % (bestes_cn["anbieter"], bestes_cn["modell"])
+                      if bestes_cn else None),
         "guenstigstes": "%s %s" % (guenstigstes["anbieter"], guenstigstes["modell"]),
         "guenstigster_preis": guenstigstes["ausgabe"],
-        "modelle": len(spitze),
+        "modelle": len(mit_preis),
     }
 
     # Nur fortschreiben, wenn sich etwas geaendert hat - sonst waechst die
     # Datei mit identischen Zeilen zu.
     letzter = verlauf[-1] if verlauf else None
     if (not letzter
-            or abs(letzter.get("schnitt_ausgabe", 0) - jetzt["schnitt_ausgabe"]) > 0.001
-            or abs(letzter.get("schnitt_eingabe", 0) - jetzt["schnitt_eingabe"]) > 0.001):
+            or abs((letzter.get("schnitt_ausgabe") or 0) - jetzt["schnitt_ausgabe"]) > 0.001
+            or abs((letzter.get("schnitt_eingabe") or 0) - jetzt["schnitt_eingabe"]) > 0.001
+            or (letzter.get("luecke") or 0) != (jetzt["luecke"] or 0)):
         verlauf.append(jetzt)
         json_speichern(TOKEN_PFAD, verlauf[-200:])
 
@@ -268,7 +345,9 @@ def tokenpreise_auswerten(konfig):
 
     return {
         "jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
-        "modelle": modelle, "stand": einst.get("stand"), "verlauf": verlauf[-30:],
+        "modelle": modelle, "liga_grenze": bestwert - 3,
+        "stand": einst.get("stand"), "quelle": einst.get("quelle"),
+        "hinweis": einst.get("hinweis"), "verlauf": verlauf[-30:],
     }
 
 
@@ -373,10 +452,39 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
         return mittel([kurse[t][feld] for t in ticker
                        if t in kurse and kurse[t].get(feld) is not None])
 
+    def gruppe_ohne(name, feld, ohne):
+        """Gruppenschnitt ohne einen einzelnen Wert - zeigt, ob ein Schwergewicht
+        das Gruppensignal allein traegt."""
+        ticker = [t for t in gruppen.get(name, {}).get("ticker", []) if t != ohne]
+        return mittel([kurse[t][feld] for t in ticker
+                       if t in kurse and kurse[t].get(feld) is not None])
+
     def wert(ticker, feld):
         return kurse.get(ticker, {}).get(feld)
 
     ind = []
+
+    # --- Alibaba einzeln gegen den Rest des China-Korbs
+    # Alibaba ist das Schwergewicht der Gruppe. Bewegt sich nur Alibaba, ist das
+    # ein Firmenereignis und kein Beleg fuer chinesischen KI-Fortschritt - genau
+    # diese Verwechslung soll der Indikator verhindern.
+    china = "China KI-Modelle und Software"
+    baba = wert("BABA", "woche_prozent")
+    rest = gruppe_ohne(china, "woche_prozent", "BABA")
+    if baba is not None and rest is not None:
+        ind.append({
+            "name": "Alibaba gegen den China-Korb",
+            "wert": baba - rest,
+            "einheit": "%%-Pkt (Woche: Alibaba %+.1f%%, Rest %+.1f%%)" % (baba, rest),
+            "erklaerung": "Alibaba ist das Schwergewicht der China-Gruppe. Ein "
+                          "grosser Abstand heisst, dass die Gruppenzahl von "
+                          "<b>einer einzelnen Aktie</b> getragen wird - dann ist "
+                          "sie kein Beleg fuer chinesischen KI-Fortschritt, "
+                          "sondern ein Firmenereignis. Nahe null heisst: Die "
+                          "Bewegung ist breit und damit aussagekraeftig.",
+            "these": "neutral",
+            "nachkomma": 1,
+        })
 
     # --- Konzentration: Nasdaq 100 gegen gleichgewichteten S&P
     ndx = wert("^NDX", "monat_prozent")
@@ -535,19 +643,40 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
     # --- Preis je Million Token: der direkte Effizienzmesswert
     token = zusatz.get("tokenpreise") if zusatz else None
     if token:
+        j = token["jetzt"]
         v = token.get("veraenderung")
+        # Der Indikator zeigt die Preisluecke bei gleicher Faehigkeit, nicht den
+        # blossen Durchschnitt: eine breite Luecke heisst, dass dieselbe Leistung
+        # in China einen Bruchteil kostet - also ist teure Rechenleistung entwertet.
+        if j.get("luecke"):
+            ind.append({
+                "name": "Preisluecke bei gleicher Faehigkeit",
+                "wert": j["luecke"],
+                "einheit": "fach teurer im Westen (%.2f gegen %.2f USD je Mio. Token)"
+                           % (j["preis_us"], j["preis_cn"]),
+                "erklaerung": "Was dieselbe Modellqualitaet in den USA gegenueber "
+                              "China kostet. <b>Je groesser der Faktor, desto "
+                              "staerker die These</b> - dann ist die teure "
+                              "westliche Rechenleistung durch billigere Leistung "
+                              "gleicher Guete ersetzbar. Bestes chinesisches "
+                              "Modell: %s (Qualitaet %s)."
+                              % (j.get("bester_cn") or "?", j.get("bester_cn_rang") or "?"),
+                "these": ("gut" if j["luecke"] >= 5
+                          else "schlecht" if j["luecke"] < 2 else "neutral"),
+                "nachkomma": 1,
+            })
         ind.append({
             "name": "Preis je Million Token",
-            "wert": token["jetzt"]["schnitt_ausgabe"],
-            "einheit": ("USD Ausgabe, Schnitt von %d Spitzenmodellen%s"
-                        % (token["jetzt"]["modelle"],
+            "wert": j["schnitt_ausgabe"],
+            "einheit": ("USD Ausgabe, Schnitt der Spitzengruppe (%d Modelle)%s"
+                        % (j["modelle"],
                            ", %+.1f%% seit %s" % (v, token["vergleich"])
                            if v is not None else "")),
-            "erklaerung": "Was ein Spitzenmodell je Million ausgegebener Token "
-                          "kostet. <b>Fallende Preise entwerten Rechenleistung</b> "
-                          "und stuetzen damit die These - das ist der einzige "
-                          "direkte Messwert fuer die Effizienzseite. Guenstigstes "
-                          "Modell derzeit: " + token["jetzt"]["guenstigstes"],
+            "erklaerung": "Was ein Modell der Spitzengruppe je Million ausgegebener "
+                          "Token kostet. <b>Fallende Preise entwerten "
+                          "Rechenleistung</b> und stuetzen damit die These - das ist "
+                          "der einzige direkte Messwert fuer die Effizienzseite. "
+                          "Guenstigstes Modell der Liste: " + j["guenstigstes"],
             "these": ("gut" if (v is not None and v < -5)
                       else "schlecht" if (v is not None and v > 5) else "neutral"),
             "nachkomma": 2,
@@ -1078,7 +1207,11 @@ LAGE HEUTE (%s)
 Barometer: %d/100 (%s) - hoch bedeutet, das Umfeld arbeitet fuer die Short-These.
 
 Positionen (Puffer = bis zur Knock-Out-Barriere, bis Stop = bis zur
-Verkaufsmarke, die deutlich frueher greift):
+Verkaufsmarke, die deutlich frueher greift; Jahresschwankung = annualisierte
+Schwankungsbreite des Basiswerts; Z-Wert = heutige Bewegung in Vielfachen der
+taeglichen Schwankung. Ein Z-Wert ueber +3 oder unter -3 ist ein Ausreisser,
+wie er rein zufaellig nur an etwa einem von 300 Handelstagen vorkommt - das ist
+meldepflichtig):
 %s
 
 Abgeleitete Indikatoren:
@@ -1090,7 +1223,16 @@ Schlagzeilen mit Stichworttreffern:
 Regierungsvorhaben:
 %s
 
-Preis je Million Token (Ausgabe, US-Dollar) - der direkte Effizienzmesswert:
+ERWARTUNGSWERTE - die Messlatten, an denen Zahlen zu messen sind
+Eine Zahl ist nur gut oder schlecht im Verhaeltnis zur Erwartung. "Rekordumsatz"
+heisst nichts, wenn der Konsens hoeher lag.
+%s
+
+Faehigkeit und Preis je Million Token - der direkte Effizienzmesswert.
+Nach Faehigkeit sortiert (Qualitaetswert 0-100), die faehigsten zuerst.
+Entscheidend ist nicht der billigste Preis, sondern der Preis bei GLEICHER
+Faehigkeit: Kostet ein chinesisches Modell auf demselben Qualitaetsrang einen
+Bruchteil, ist teure westliche Rechenleistung in genau dem Mass entwertet.
 %s
 
 Veroeffentlichungen der KI-Labore:
@@ -1203,12 +1345,14 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         date.today().strftime("%d.%m.%Y"),
         barometer[0], barometer[1],
         zeilen(positionen, 5, lambda p: "  %s (%s): Basiswert %.2f, Tag %+.2f%%, "
-               "Puffer %s, bis Stop %s" % (
+               "Puffer %s, bis Stop %s, Jahresschwankung %s, Z-Wert %s" % (
                    p["name"], p.get("wkn", ""), p["kurs"], p["tag_prozent"],
                    ("%.1f%%" % p["barriere_abstand"]) if p.get("barriere_abstand")
                    is not None else "?",
                    ("%.1f%%" % p["abstand_verlustschwelle"])
-                   if p.get("abstand_verlustschwelle") is not None else "?")),
+                   if p.get("abstand_verlustschwelle") is not None else "?",
+                   ("%.0f%%" % p["sigma_jahr"]) if p.get("sigma_jahr") else "?",
+                   ("%+.2f" % p["z_wert"]) if p.get("z_wert") is not None else "?")),
         zeilen(indikatoren, 12, lambda i: "  %s: %.2f %s" % (
             i["name"], i["wert"], i["einheit"])),
         zeilen(relevant, 25, lambda n: "  [%s] %s (%s)" % (
@@ -1216,12 +1360,22 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
             n["titel"][:150], n.get("quelle", ""))),
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
-        ("\n".join("  %-10s %-22s %s %5.2f Ausgabe%s"
-                    % (m["anbieter"], m["modell"], m.get("land", ""), m["ausgabe"],
+        kennzahlen_text(konfig),
+        ((("\n".join("  Guete %3s  %-24s %-10s %s  %s USD Ausgabe%s"
+                    % (m.get("faehigkeit", "?"), m["modell"], m["anbieter"],
+                       m.get("land", ""),
+                       ("%6.2f" % m["ausgabe"]) if m.get("ausgabe") else "     -",
                        "  " + m["bemerkung"] if m.get("bemerkung") else "")
-                    for m in sorted((tokenpreise or {}).get("modelle", []),
-                                    key=lambda x: x["ausgabe"])[:10])
-         or "  (keine Preise hinterlegt)"),
+                    for m in (tokenpreise or {}).get("modelle", [])[:18]))
+          + ("\n\n  Spitzengruppe: Westen %.2f gegen China %.2f USD, "
+             "also Faktor %.1f. Bestes chinesisches Modell: %s (Guete %s)."
+             % (((tokenpreise or {}).get("jetzt") or {}).get("preis_us") or 0,
+                ((tokenpreise or {}).get("jetzt") or {}).get("preis_cn") or 0,
+                ((tokenpreise or {}).get("jetzt") or {}).get("luecke") or 0,
+                ((tokenpreise or {}).get("jetzt") or {}).get("bester_cn") or "?",
+                ((tokenpreise or {}).get("jetzt") or {}).get("bester_cn_rang") or "?")
+             if ((tokenpreise or {}).get("jetzt") or {}).get("luecke") else ""))
+         if (tokenpreise or {}).get("modelle") else "  (keine Preise hinterlegt)"),
         zeilen(blogs, 10, lambda b: "  [%s] %s" % (b["quelle"], b["titel"][:150])),
         zeilen(sec, 10, lambda s: "  %s %s%s%s" % (
             s.get("datum", ""), s["titel"][:130],
@@ -2770,34 +2924,105 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                     html_schuetzen(n.get("thema", "")), richtung,
                     html_schuetzen(", ".join(n["treffer"]))))
 
+    # ---- Erwartungswerte: die Messlatten
+    kz = konfig.get("kennzahlen") or {}
+    if kz:
+        n = kz.get("nvidia_quartal") or {}
+        h = kz.get("hyperscaler_capex") or {}
+        t.append("<h2>Erwartungswerte</h2>")
+        t.append('<div class="klein" style="margin-bottom:8px">Eine Zahl ist nur '
+                 'gut oder schlecht im Verhaeltnis zur Erwartung. Diese Messlatten '
+                 'stehen fest, bevor die Zahlen kommen.</div>')
+        if n:
+            t.append('<div class="karte"><b>%s &middot; %s%s</b>'
+                     '<div class="tabelle" style="margin-top:6px"><table>'
+                     '<tr><td>Konsens Umsatz</td><td class="z"><b>%.2f Mrd USD</b></td></tr>'
+                     '<tr><td>Konsens Gewinn je Aktie</td><td class="z">%.2f</td></tr>'
+                     '<tr><td>Eigene Prognose des Unternehmens</td>'
+                     '<td class="z">%.1f Mrd &plusmn;&nbsp;%d%%</td></tr>'
+                     '<tr><td>Rechenzentrum (abgeleitet, %d%% Anteil)</td>'
+                     '<td class="z">%.1f Mrd</td></tr>'
+                     '<tr><td>Vorquartal</td><td class="z">%.1f Mrd '
+                     '(Rechenzentrum %.1f)</td></tr>'
+                     '<tr style="background:rgba(120,160,255,.10)">'
+                     '<td><b>Konsens Folgequartal</b></td>'
+                     '<td class="z"><b>%.1f Mrd USD</b></td></tr>'
+                     '</table></div><div class="klein" style="margin-top:6px">%s</div></div>'
+                     % (html_schuetzen(n.get("bezeichnung", "")),
+                        html_schuetzen(n.get("termin", "")),
+                        " nach US-Boersenschluss" if n.get("nach_boersenschluss") else "",
+                        n.get("konsens_umsatz_mrd", 0), n.get("konsens_gewinn_je_aktie", 0),
+                        n.get("eigene_prognose_mrd", 0),
+                        n.get("eigene_prognose_spanne_prozent", 0),
+                        n.get("rechenzentrum_anteil_prozent", 0),
+                        n.get("konsens_rechenzentrum_mrd", 0),
+                        n.get("vorquartal_umsatz_mrd", 0),
+                        n.get("vorquartal_rechenzentrum_mrd", 0),
+                        n.get("konsens_folgequartal_mrd", 0),
+                        html_schuetzen(n.get("hinweis", ""))))
+        if h:
+            einzeln = h.get("einzeln") or {}
+            t.append('<div class="karte"><b>%s &middot; %s</b>'
+                     '<div class="tabelle" style="margin-top:6px"><table>'
+                     % (html_schuetzen(h.get("bezeichnung", "")),
+                        html_schuetzen(h.get("quartal", ""))))
+            for anb, v in sorted(einzeln.items(), key=lambda x: -x[1]):
+                t.append('<tr><td>%s</td><td class="z">%.2f Mrd</td></tr>'
+                         % (html_schuetzen(anb), v))
+            t.append('<tr style="background:rgba(120,160,255,.10)"><td><b>Summe</b></td>'
+                     '<td class="z"><b>%.1f Mrd USD</b></td></tr>'
+                     '<tr><td>Vorquartal</td><td class="z">%.1f Mrd</td></tr>'
+                     '<tr><td>Wachstum</td><td class="z">+%d%% Jahr, +%d%% Quartal</td></tr>'
+                     '</table></div><div class="klein" style="margin-top:6px">%s</div></div>'
+                     % (h.get("summe_mrd", 0), h.get("vorquartal_mrd", 0),
+                        h.get("vorjahr_wachstum_prozent", 0),
+                        h.get("vorquartal_wachstum_prozent", 0),
+                        html_schuetzen(h.get("hinweis", ""))))
+        t.append('<div class="klein">Quelle: %s</div>'
+                 % html_schuetzen(kz.get("quelle", "?")))
+
     # ---- Token-Preise
     token = (konfig.get("_tokenpreise") or {})
     if token.get("modelle"):
+        j = token.get("jetzt") or {}
         v = token.get("veraenderung")
-        t.append("<h2>Preis je Million Token</h2>")
-        t.append('<div class="klein" style="margin-bottom:8px">Der direkte '
-                 'Messwert fuer die Effizienzseite der These. Fallen die Preise '
-                 'schnell, wird Rechenleistung entwertet.%s</div>'
-                 % (" Aenderung seit %s: <b>%+.1f%%</b>." % (token["vergleich"], v)
-                    if v is not None else " Noch kein Vergleichsstand."))
-        t.append("<div class='tabelle'><table><tr><th>Anbieter</th><th>Modell</th>"
-                 "<th>Land</th><th class='z'>Eingabe</th><th class='z'>Ausgabe</th>"
+        t.append("<h2>Faehigkeit und Preis je Million Token</h2>")
+        kopf = ('Nach Faehigkeit sortiert, die faehigsten oben. Daneben, was das '
+                'Modell je Million Token kostet. Fuer die These zaehlt nicht der '
+                'billigste Preis, sondern der Preis bei gleicher Faehigkeit.')
+        if j.get("luecke"):
+            kopf += (' In der Spitzengruppe kostet der Westen derzeit das '
+                     '<b>%.1f-fache</b> Chinas (%.2f gegen %.2f USD Ausgabe).'
+                     % (j["luecke"], j["preis_us"], j["preis_cn"]))
+        if v is not None:
+            kopf += ' Aenderung seit %s: <b>%+.1f%%</b>.' % (token["vergleich"], v)
+        t.append('<div class="klein" style="margin-bottom:8px">%s</div>' % kopf)
+        t.append("<div class='tabelle'><table><tr><th class='z'>Faehigkeit</th>"
+                 "<th>Modell</th><th>Anbieter</th><th>Land</th>"
+                 "<th class='z'>Eingabe</th><th class='z'>Ausgabe</th>"
                  "<th>Bemerkung</th></tr>")
-        for m in sorted(token["modelle"], key=lambda x: x["ausgabe"]):
-            t.append("<tr><td>%s</td><td>%s%s</td><td class='klein'>%s</td>"
-                     "<td class='z'>%.2f</td><td class='z'><b>%.2f</b></td>"
-                     "<td class='klein'>%s</td></tr>"
-                     % (html_schuetzen(m["anbieter"]), html_schuetzen(m["modell"]),
-                        " &#9733;" if m.get("spitzenklasse") else "",
-                        html_schuetzen(m.get("land", "")),
-                        m["eingabe"], m["ausgabe"],
+        grenze = token.get("liga_grenze") or 0
+        for m in token["modelle"]:
+            liga = (m.get("faehigkeit") or 0) >= grenze
+            preis = ("<td class='z'>%.2f</td><td class='z'><b>%.2f</b></td>"
+                     % (m["eingabe"], m["ausgabe"])) if m.get("ausgabe") else \
+                    "<td class='z'>&ndash;</td><td class='z'>&ndash;</td>"
+            t.append("<tr%s><td class='z'><b>%s</b></td><td>%s</td><td>%s</td>"
+                     "<td class='klein'>%s</td>%s<td class='klein'>%s</td></tr>"
+                     % (" style='background:rgba(120,160,255,.07)'" if liga else "",
+                        m.get("faehigkeit", "?"), html_schuetzen(m["modell"]),
+                        html_schuetzen(m["anbieter"]),
+                        html_schuetzen(m.get("land", "")), preis,
                         html_schuetzen(m.get("bemerkung", ""))))
         t.append("</table></div>")
-        t.append('<div class="klein" style="margin-top:8px">Preise in US-Dollar je '
-                 'Million Token. Ein Stern kennzeichnet die Spitzenklasse, aus der '
-                 'der Durchschnitt gebildet wird. Stand der Liste: %s. Pflege ueber '
-                 '<code>tokenpreise</code> in der Konfiguration.</div>'
-                 % html_schuetzen(token.get("stand", "?")))
+        t.append('<div class="klein" style="margin-top:8px">Faehigkeit ist der '
+                 'Qualitaetswert der Rangliste (0 bis 100). Preise in US-Dollar je '
+                 'Million Token. Die hinterlegten Zeilen bilden die Spitzengruppe '
+                 '(Qualitaet ab %s), aus der die Preisluecke gerechnet wird; '
+                 '&ndash; heisst, dass kein Preis ermittelt wurde. Quelle: %s. '
+                 'Stand: %s.</div>'
+                 % (grenze, html_schuetzen(token.get("quelle", "?")),
+                    html_schuetzen(token.get("stand", "?"))))
 
     # ---- Regierung
     t.append("<h2>Regierungsvorhaben (Federal Register)</h2>")

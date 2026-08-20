@@ -279,6 +279,14 @@ Nichts davon steht im Repo oder in der Konfiguration:
 
 Alle mit Rechten 600. `config.pi.json` im Repo ist eine bereinigte Vorlage.
 
+> **Konfiguration nie vom Mac auf den Pi kopieren.** Die beiden Fassungen
+> unterscheiden sich absichtlich: Nur die Pi-Fassung enthaelt die Bloecke
+> `mail`, `telegram` und `hue` sowie den richtigen `bericht_kopie`-Pfad. Ein
+> `scp config.json` vom Mac loescht sie und legt damit die ganze Meldekette
+> still - lautlos, denn die laufenden Prozesse merken es erst beim Neustart.
+> Aenderungen an der Konfiguration stattdessen direkt auf dem Pi einspielen
+> oder gezielt einzelne Schluessel ergaenzen.
+
 Mail geht über den lokalen Postfix, deshalb sind dort keine Zugangsdaten nötig.
 
 ## Pflege

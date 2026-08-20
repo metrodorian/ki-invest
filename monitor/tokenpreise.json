@@ -1,0 +1,15 @@
+[
+  {
+    "datum": "2026-08-20",
+    "schnitt_eingabe": 5.8,
+    "schnitt_ausgabe": 30.4571,
+    "preis_us": 35.0,
+    "preis_cn": 3.2,
+    "luecke": 10.94,
+    "bester_cn_rang": 97,
+    "bester_cn": "Moonshot Kimi K3",
+    "guenstigstes": "DeepSeek DeepSeek V4 Pro",
+    "guenstigster_preis": 0.87,
+    "modelle": 12
+  }
+]

@@ -31,7 +31,7 @@ HILFE = """<b>Befehle</b>
 <b>bericht</b> - den letzten Bericht als Datei
 <b>neu</b> - einen frischen Bericht rechnen (dauert einige Minuten)
 <b>termine</b> - was als Naechstes ansteht
-<b>tokenpreise</b> - Preis je Million Token der Spitzenmodelle
+<b>tokenpreise</b> - Faehigkeit und Preis je Million Token
 
 <b>ruhe</b> - Alarme bis morgen frueh stumm (Ueberwachung laeuft weiter)
 <b>ruhe aus</b> - Stummschaltung sofort aufheben
@@ -163,11 +163,14 @@ def antwort_tokenpreise(konfig):
     if not modelle:
         return "Keine Token-Preise hinterlegt."
 
-    zeilen = ["<b>Preis je Million Token</b> (Ausgabe, US-Dollar)", ""]
-    for m in sorted(modelle, key=lambda x: x["ausgabe"]):
-        zeilen.append("%s%.2f  %s %s%s"
-                      % ("★ " if m.get("spitzenklasse") else "   ",
-                         m["ausgabe"], m["anbieter"], m["modell"],
+    modelle = sorted(modelle, key=lambda x: (-(x.get("faehigkeit") or 0),
+                                             x.get("rang") or 999))
+    zeilen = ["<b>Faehigkeit und Preis je Mio. Token</b> (Ausgabe, USD)",
+              "<i>faehigste zuerst</i>", ""]
+    for m in modelle:
+        preis = ("%6.2f" % m["ausgabe"]) if m.get("ausgabe") else "     -"
+        zeilen.append("<code>%3s %s</code>  %s%s"
+                      % (m.get("faehigkeit", "?"), preis, m["modell"],
                          "  (%s)" % m["land"] if m.get("land") else ""))
 
     verlauf = []
@@ -181,8 +184,12 @@ def antwort_tokenpreise(konfig):
         a, b = verlauf[-2], verlauf[-1]
         if a.get("schnitt_ausgabe"):
             v = (b["schnitt_ausgabe"] / a["schnitt_ausgabe"] - 1) * 100
-            zeilen += ["", "Schnitt der Spitzenklasse: <b>%.2f</b> (%+.1f%% seit %s)"
+            zeilen += ["", "Schnitt der Spitzengruppe: <b>%.2f</b> (%+.1f%% seit %s)"
                        % (b["schnitt_ausgabe"], v, a.get("datum", "?"))]
+    if verlauf and verlauf[-1].get("luecke"):
+        j = verlauf[-1]
+        zeilen += ["Gleiche Guete: Westen <b>%.2f</b> gegen China <b>%.2f</b> "
+                   "= Faktor <b>%.1f</b>" % (j["preis_us"], j["preis_cn"], j["luecke"])]
     elif verlauf:
         zeilen += ["", "Schnitt der Spitzenklasse: <b>%.2f</b> (erster Stand)"
                    % verlauf[-1]["schnitt_ausgabe"]]
