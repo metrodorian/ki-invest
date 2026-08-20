@@ -404,22 +404,31 @@ def indikatoren_bauen(kurse, gruppen):
     hyg = wert("HYG", "monat_prozent")
     lqd = wert("LQD", "monat_prozent")
     if hyg is not None and lqd is not None:
-        aufschlag = hyg - lqd
+        # Als Aufschlag gerechnet, nicht als Wertentwicklung: Wenn Hochzins
+        # schlechter laeuft als erste Bonitaet, weitet sich der Risikoaufschlag.
+        # Steigende Zahl heisst also teurere Refinanzierung - und das stuetzt
+        # die These. Die umgekehrte Rechnung haette dem Namen widersprochen.
+        aufschlag = lqd - hyg
         ind.append({
             "name": "Kreditrisiko-Aufschlag",
             "wert": aufschlag,
-            "einheit": "%-Pkt, Hochzins gegen erste Bonitaet (1 Monat)",
-            "erklaerung": "Hochzinsanleihen gegen Anleihen erster Bonitaet. Die "
-                          "Differenz trennt echtes Ausfallrisiko von blossen "
-                          "Zinsbewegungen, die beide gleich treffen. Faellt sie, "
-                          "wird die Refinanzierung der schuldenfinanzierten "
-                          "Neoclouds teurer - ihr wunder Punkt.",
-            "these": "gut" if aufschlag < -1 else "neutral",
+            "einheit": "%-Pkt Ausweitung (1 Monat)",
+            "erklaerung": "Wie weit Hochzinsanleihen hinter erster Bonitaet "
+                          "zurueckbleiben. Das trennt echtes Ausfallrisiko von "
+                          "blossen Zinsbewegungen, die beide gleich treffen. "
+                          "<b>Steigt der Aufschlag, wird die Refinanzierung der "
+                          "schuldenfinanzierten Rechenzentrumsbauer teuer</b> - "
+                          "und eine Blase platzt ueber die Finanzierung, nicht "
+                          "ueber die Stimmung.",
+            "these": ("gut" if aufschlag > 1
+                      else "schlecht" if aufschlag < -1 else "neutral"),
+            "richtung": "hoch_ist_gut",
         })
     elif hyg is not None:
         ind.append({
             "name": "Hochzins-Kredite (HYG)",
             "wert": hyg,
+            "richtung": "tief_ist_gut",
             "einheit": "% (1 Monat)",
             "erklaerung": "Die Neoclouds finanzieren GPUs mit Fremdkapital. Faellt "
                           "HYG, wird ihre Refinanzierung teurer.",
@@ -1481,13 +1490,23 @@ def kernbox(indikatoren, gruppen_ansicht):
     if haupt:
         klasse = ("gut" if haupt["these"] == "gut"
                   else "schlecht" if haupt["these"] == "schlecht" else "neutral")
-        t.append('<div class="kern-haupt"><div class="kern-titel">Kreditrisiko-Aufschlag</div>'
+        # Skala von -3 bis +3 Prozentpunkten: links rot (Risikofreude, gegen
+        # die These), Mitte grau, rechts gruen (Stress, fuer die These).
+        anteil = max(0.0, min(1.0, (haupt["wert"] + 3.0) / 6.0))
+        t.append('<div class="kern-haupt">'
+                 '<div class="kern-titel">Kreditrisiko-Aufschlag</div>'
                  '<div class="kern-wert %s">%+.2f</div>'
-                 '<div class="kern-hinweis">Hochzins gegen erste Bonitaet, 1 Monat. '
-                 'Faellt er deutlich, wird die Refinanzierung der schuldenfinanzierten '
-                 'Rechenzentrumsbauer teuer. <b>Eine Blase platzt ueber die '
-                 'Finanzierung</b> &ndash; hier zeigt sie sich zuerst.</div></div>'
-                 % (klasse, haupt["wert"]))
+                 '<div class="kernskala"><i style="left:calc(%.1f%% - 1px)"></i></div>'
+                 '<div class="kernskala-marken"><span>-3 Risikofreude</span>'
+                 '<span>0</span><span>+3 Stress</span></div>'
+                 '<div class="kern-hinweis">Wie weit Hochzinsanleihen hinter '
+                 'erster Bonitaet zurueckbleiben, ueber einen Monat. '
+                 '<b>Steigt er, wird die Refinanzierung der schuldenfinanzierten '
+                 'Rechenzentrumsbauer teuer</b> &ndash; das stuetzt die These. '
+                 'Faellt er, ist Geld billig und der Ausbau laeuft weiter. '
+                 'Eine Blase platzt ueber die Finanzierung, nicht ueber die '
+                 'Stimmung &ndash; hier zeigt sie sich zuerst.</div></div>'
+                 % (klasse, haupt["wert"], anteil * 100))
 
     weitere = [nach_name[n] for n in KERNINDIKATOREN[1:] if n in nach_name]
     if weitere:
@@ -1824,6 +1843,13 @@ ul.liste li:last-child{border-bottom:none}
 .kern-wert{font-size:31px;font-weight:650;line-height:1.05;letter-spacing:-.02em;
  font-variant-numeric:tabular-nums;margin-bottom:5px}
 .kern-hinweis{font-size:11.5px;color:var(--gedaempft);line-height:1.45}
+.kernskala{height:8px;border-radius:4px;margin:9px 0 4px;position:relative;
+ background:linear-gradient(90deg,var(--schlecht) 0%,var(--flaeche2) 42%,
+ var(--flaeche2) 58%,var(--gut) 100%)}
+.kernskala i{position:absolute;top:-3px;width:3px;height:14px;border-radius:2px;
+ background:var(--text)}
+.kernskala-marken{display:flex;justify-content:space-between;font-size:9.5px;
+ color:var(--gedaempft);margin-bottom:8px;letter-spacing:.02em}
 .kern-liste{padding:11px 0;border-bottom:1px solid var(--rand)}
 .kern-zeile{display:flex;justify-content:space-between;align-items:baseline;
  font-size:12.5px;padding:3px 0;gap:10px}

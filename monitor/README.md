@@ -109,7 +109,7 @@ chinesische KI durch **Effizienz** aufholt, die Fertigungsseite, ob sie es durch
 | Strom-Relativstärke | Engpassfaktor 2026 |
 | China-KI-Relativstärke | Alibaba, Tencent, SenseTime, iFlytek, Kingsoft Cloud, Baidu — die Modellseite, der Kern der China-These |
 | China-Chipfertigung | SMIC, Cambricon, Hua Hong — die Hardwareseite. Misst etwas anderes und darf der Modellseite widersprechen |
-| Kreditrisiko-Aufschlag | Hochzins gegen erste Bonität, trennt Ausfallrisiko von Zinsbewegung |
+| Kreditrisiko-Aufschlag | Wie weit Hochzins hinter erster Bonität zurückbleibt. **Steigt er, wird Refinanzierung teuer** — das stützt die These. Als Aufschlag gerechnet (`LQD − HYG`), damit Name und Richtung zusammenpassen |
 | Speicherpreise | Kostenseite der Capex-Rendite |
 
 **Barometer 0–100** — verdichtet Relativstärken, Volatilitätsstruktur,
