@@ -339,5 +339,128 @@
     "ton_alarm": "Basso"
   },
   "nachrichten_hoechstalter_tage": 14,
-  "bericht_kopie": "/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/web/index.html"
+  "bericht_kopie": "/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/web/index.html",
+  "tokenpreise": {
+    "stand": "2026-08-20",
+    "quelle": "Websuche, Anbieterseiten; Stand August 2026",
+    "hinweis": "Preis je Million Token, Eingabe/Ausgabe, in US-Dollar. Fallende Preise entwerten Rechenleistung und stuetzen damit die These.",
+    "modelle": [
+      {
+        "anbieter": "Alibaba",
+        "modell": "Qwen3.7 Flash",
+        "eingabe": 0.03,
+        "ausgabe": 0.13,
+        "stand": "2026-08-20",
+        "land": "CN",
+        "spitzenklasse": true
+      },
+      {
+        "anbieter": "DeepSeek",
+        "modell": "DeepSeek V4 Flash",
+        "eingabe": 0.14,
+        "ausgabe": 0.28,
+        "stand": "2026-08-20",
+        "land": "CN",
+        "spitzenklasse": true,
+        "bemerkung": "Ab 16.08. neue Staffel: 0,22 Eingabe / 0,66 Ausgabe ausserhalb der Spitzenzeit, zur Spitzenzeit doppelt"
+      },
+      {
+        "anbieter": "OpenAI",
+        "modell": "GPT-5.6 Luna",
+        "eingabe": 0.2,
+        "ausgabe": 1.2,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": true,
+        "bemerkung": "um 80 Prozent gesenkt"
+      },
+      {
+        "anbieter": "Mistral",
+        "modell": "Mistral Small 4",
+        "eingabe": 0.15,
+        "ausgabe": 0.6,
+        "stand": "2026-08-20",
+        "land": "EU",
+        "spitzenklasse": false
+      },
+      {
+        "anbieter": "Google",
+        "modell": "Gemini 3.7 Flash",
+        "eingabe": 0.75,
+        "ausgabe": 3.75,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": true,
+        "bemerkung": "Einfuehrungspreis bis 31.12.2026, danach 1,50 / 7,50"
+      },
+      {
+        "anbieter": "Anthropic",
+        "modell": "Claude Haiku 4.5",
+        "eingabe": 1.0,
+        "ausgabe": 5.0,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": true
+      },
+      {
+        "anbieter": "Zhipu",
+        "modell": "GLM 5.2",
+        "eingabe": 1.4,
+        "ausgabe": 4.4,
+        "stand": "2026-08-20",
+        "land": "CN",
+        "spitzenklasse": false
+      },
+      {
+        "anbieter": "Google",
+        "modell": "Gemini 3.1 Pro",
+        "eingabe": 2.0,
+        "ausgabe": 12.0,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": false
+      },
+      {
+        "anbieter": "Anthropic",
+        "modell": "Claude Opus 5",
+        "eingabe": 5.0,
+        "ausgabe": 25.0,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": false
+      },
+      {
+        "anbieter": "OpenAI",
+        "modell": "GPT-5.6 Sol",
+        "eingabe": 5.0,
+        "ausgabe": 30.0,
+        "stand": "2026-08-20",
+        "land": "US",
+        "spitzenklasse": false
+      }
+    ]
+  },
+  "alarmschwellen": {
+    "aktiv": true,
+    "hinweis": "Feste Schwellen, bei denen das Skript selbst alarmiert - auch in den Zehn-Minuten-Laeufen ohne Claude. Claudes Ermessen bleibt zusaetzlich bestehen; das hier ist das Netz darunter.",
+    "fuer_these": {
+      "schein_gewinn_tag_prozent": 25,
+      "basiswert_sturz_tag_prozent": 8,
+      "risikoaufschlag_monat_bp": 50,
+      "risikoaufschlag_woche_bp": 25,
+      "vix_struktur_ueber": 1.0,
+      "neocloud_relativstaerke_unter": -15
+    },
+    "gegen_these": {
+      "schein_verlust_tag_prozent": 20,
+      "abstand_stop_unter_prozent": 12,
+      "barriere_puffer_unter_prozent": 25,
+      "basiswert_anstieg_tag_prozent": 8,
+      "z_wert_ueber": 3.0
+    },
+    "strukturell": {
+      "termin_in_tagen": 1,
+      "zeitlimit_in_tagen": 3
+    }
+  }
 }

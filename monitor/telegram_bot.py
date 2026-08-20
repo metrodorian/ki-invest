@@ -31,6 +31,7 @@ HILFE = """<b>Befehle</b>
 <b>bericht</b> - den letzten Bericht als Datei
 <b>neu</b> - einen frischen Bericht rechnen (dauert einige Minuten)
 <b>termine</b> - was als Naechstes ansteht
+<b>tokenpreise</b> - Preis je Million Token der Spitzenmodelle
 
 <b>ruhe</b> - Alarme bis morgen frueh stumm (Ueberwachung laeuft weiter)
 <b>ruhe aus</b> - Stummschaltung sofort aufheben
@@ -153,6 +154,42 @@ def antwort_kurse(konfig):
         zeilen.append("  Quelle: %s" % p.get("kurs_quelle", "?"))
         zeilen.append("")
     return "\n".join(zeilen) or "Keine Kurse vorhanden."
+
+
+def antwort_tokenpreise(konfig):
+    """Der direkte Effizienzmesswert - die Preisseite der These."""
+    einst = konfig.get("tokenpreise") or {}
+    modelle = einst.get("modelle") or []
+    if not modelle:
+        return "Keine Token-Preise hinterlegt."
+
+    zeilen = ["<b>Preis je Million Token</b> (Ausgabe, US-Dollar)", ""]
+    for m in sorted(modelle, key=lambda x: x["ausgabe"]):
+        zeilen.append("%s%.2f  %s %s%s"
+                      % ("★ " if m.get("spitzenklasse") else "   ",
+                         m["ausgabe"], m["anbieter"], m["modell"],
+                         "  (%s)" % m["land"] if m.get("land") else ""))
+
+    verlauf = []
+    pfad = os.path.join(BASIS, "tokenpreise.json")
+    if os.path.exists(pfad):
+        try:
+            verlauf = json.load(open(pfad))
+        except ValueError:
+            verlauf = []
+    if len(verlauf) >= 2:
+        a, b = verlauf[-2], verlauf[-1]
+        if a.get("schnitt_ausgabe"):
+            v = (b["schnitt_ausgabe"] / a["schnitt_ausgabe"] - 1) * 100
+            zeilen += ["", "Schnitt der Spitzenklasse: <b>%.2f</b> (%+.1f%% seit %s)"
+                       % (b["schnitt_ausgabe"], v, a.get("datum", "?"))]
+    elif verlauf:
+        zeilen += ["", "Schnitt der Spitzenklasse: <b>%.2f</b> (erster Stand)"
+                   % verlauf[-1]["schnitt_ausgabe"]]
+
+    zeilen += ["", "★ zaehlt zur Spitzenklasse. Fallende Preise entwerten "
+               "Rechenleistung und stuetzen die These."]
+    return "\n".join(zeilen)
 
 
 def antwort_termine(konfig):
@@ -303,6 +340,8 @@ def verarbeiten(konfig, token, chat, text):
         return antwort_kurse(konfig)
     if befehl in ("termine", "termin"):
         return antwort_termine(konfig)
+    if befehl in ("tokenpreise", "token", "preise"):
+        return antwort_tokenpreise(konfig)
 
     if befehl in ("bericht", "report"):
         pfad = os.path.join(BASIS, "bericht.html")

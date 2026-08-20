@@ -111,6 +111,34 @@ chinesische KI durch **Effizienz** aufholt, die Fertigungsseite, ob sie es durch
 | China-Chipfertigung | SMIC, Cambricon, Hua Hong — die Hardwareseite. Misst etwas anderes und darf der Modellseite widersprechen |
 | Kreditrisiko-Aufschlag | Wie weit Hochzins hinter erster Bonität zurückbleibt. **Steigt er, wird Refinanzierung teuer** — das stützt die These. Als Aufschlag gerechnet (`LQD − HYG`), damit Name und Richtung zusammenpassen |
 | Speicherpreise | Kostenseite der Capex-Rendite |
+| Preis je Million Token | Der **direkte** Effizienzmesswert. Fallende Preise entwerten Rechenleistung und stützen die These — alles andere misst Effizienz nur über Aktienkurse |
+
+### Feste Alarmschwellen
+
+Claude entscheidet nur zur vollen Stunde über eine Eilmeldung. Damit die
+Zwischenläufe nicht stumm bleiben, prüft das Skript zusätzlich harte Schwellen —
+konfigurierbar unter `alarmschwellen`:
+
+**Für die These** (Gewinnmitnahme erwägen): Schein gewinnt über 25% am Tag,
+Basiswert fällt über 8%, Risikoaufschlag weitet sich über 50 Bp im Monat oder
+25 Bp in der Woche, VIX-Terminstruktur über 1,00, Neocloud-Relativstärke unter
+−15 Punkte.
+
+**Gegen die These** (Position gefährdet): Schein verliert über 20% am Tag,
+Abstand zur Stop-Marke unter 12%, Barriere-Puffer unter 25%, Basiswert steigt
+über 8%, Z-Wert über 3 gegen die Position.
+
+**Strukturell:** ein Termin heute oder morgen, Zeitlimit in drei Tagen.
+
+Jede Schwelle meldet höchstens einmal pro Tag. Die Stummschaltung wird
+respektiert. Claudes Ermessen bleibt zusätzlich bestehen — die Schwellen sind
+das Netz darunter, nicht der Ersatz.
+
+### Token-Preise
+
+Gepflegt unter `tokenpreise` in der Konfiguration, mit Verlauf in
+`tokenpreise.json`. Bei jeder Preisänderung wird der alte Stand fortgeschrieben,
+sodass eine Zeitreihe entsteht. Telegram-Befehl: **tokenpreise**.
 
 **Barometer 0–100** — verdichtet Relativstärken, Volatilitätsstruktur,
 Kreditumfeld und Nachrichtenbilanz. Hoch heißt: Das Umfeld arbeitet für die

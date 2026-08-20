@@ -42,6 +42,7 @@ CONFIG_PFAD = os.path.join(BASIS, "config.json")
 STATE_PFAD = os.path.join(BASIS, "state.json")
 DATEN_PFAD = os.path.join(BASIS, "daten.json")
 CLAUDE_PFAD = os.path.join(BASIS, "claude.json")
+TOKEN_PFAD = os.path.join(BASIS, "tokenpreise.json")
 BERICHT_PFAD = os.path.join(BASIS, "bericht.html")
 LOG_PFAD = os.path.join(BASIS, "monitor.log")
 
@@ -211,6 +212,64 @@ def scheinkurs_holen(isin, kennung):
     return {"geld": geld, "brief": brief,
             "spread_prozent": ((brief - geld) / brief * 100.0)
                               if (geld and brief) else None}
+
+
+def tokenpreise_auswerten(konfig):
+    """
+    Verfolgt den Preis je Million Token der guenstigsten Spitzenmodelle.
+
+    Das ist der einzige direkte Messwert fuer die Effizienzseite der These:
+    Fallen die Preise schnell, wird Rechenleistung entwertet - und genau
+    darauf setzt die Wette. Alles andere misst Effizienz nur ueber den Umweg
+    von Aktienkursen, also gar nicht.
+
+    Bei jeder Preisaenderung wird der alte Stand fortgeschrieben, sodass
+    ueber die Wochen eine Zeitreihe entsteht.
+    """
+    einst = konfig.get("tokenpreise") or {}
+    modelle = einst.get("modelle") or []
+    spitze = [m for m in modelle if m.get("spitzenklasse")]
+    if not spitze:
+        return None
+
+    schnitt_ein = sum(m["eingabe"] for m in spitze) / len(spitze)
+    schnitt_aus = sum(m["ausgabe"] for m in spitze) / len(spitze)
+    guenstigstes = min(spitze, key=lambda m: m["ausgabe"])
+
+    verlauf = json_laden(TOKEN_PFAD, [])
+    if not isinstance(verlauf, list):
+        verlauf = []
+
+    jetzt = {
+        "datum": date.today().isoformat(),
+        "schnitt_eingabe": round(schnitt_ein, 4),
+        "schnitt_ausgabe": round(schnitt_aus, 4),
+        "guenstigstes": "%s %s" % (guenstigstes["anbieter"], guenstigstes["modell"]),
+        "guenstigster_preis": guenstigstes["ausgabe"],
+        "modelle": len(spitze),
+    }
+
+    # Nur fortschreiben, wenn sich etwas geaendert hat - sonst waechst die
+    # Datei mit identischen Zeilen zu.
+    letzter = verlauf[-1] if verlauf else None
+    if (not letzter
+            or abs(letzter.get("schnitt_ausgabe", 0) - jetzt["schnitt_ausgabe"]) > 0.001
+            or abs(letzter.get("schnitt_eingabe", 0) - jetzt["schnitt_eingabe"]) > 0.001):
+        verlauf.append(jetzt)
+        json_speichern(TOKEN_PFAD, verlauf[-200:])
+
+    veraenderung = None
+    vergleich = None
+    if len(verlauf) >= 2:
+        vorher = verlauf[-2]
+        if vorher.get("schnitt_ausgabe"):
+            veraenderung = ((jetzt["schnitt_ausgabe"] / vorher["schnitt_ausgabe"]) - 1) * 100
+            vergleich = vorher.get("datum")
+
+    return {
+        "jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
+        "modelle": modelle, "stand": einst.get("stand"), "verlauf": verlauf[-30:],
+    }
 
 
 def fred_reihe(kennung, reihe="BAMLH0A0HYM2", tage=140):
@@ -471,6 +530,27 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if monat_bp < -25 else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": monat_bp,
+        })
+
+    # --- Preis je Million Token: der direkte Effizienzmesswert
+    token = zusatz.get("tokenpreise") if zusatz else None
+    if token:
+        v = token.get("veraenderung")
+        ind.append({
+            "name": "Preis je Million Token",
+            "wert": token["jetzt"]["schnitt_ausgabe"],
+            "einheit": ("USD Ausgabe, Schnitt von %d Spitzenmodellen%s"
+                        % (token["jetzt"]["modelle"],
+                           ", %+.1f%% seit %s" % (v, token["vergleich"])
+                           if v is not None else "")),
+            "erklaerung": "Was ein Spitzenmodell je Million ausgegebener Token "
+                          "kostet. <b>Fallende Preise entwerten Rechenleistung</b> "
+                          "und stuetzen damit die These - das ist der einzige "
+                          "direkte Messwert fuer die Effizienzseite. Guenstigstes "
+                          "Modell derzeit: " + token["jetzt"]["guenstigstes"],
+            "these": ("gut" if (v is not None and v < -5)
+                      else "schlecht" if (v is not None and v > 5) else "neutral"),
+            "nachkomma": 2,
         })
 
     # --- Speicherpreise als Kostenindikator
@@ -970,7 +1050,7 @@ def einordnen(eintrag, fuer_these, gegen_these):
 # =========================================================== Claude-Einschaetzung
 
 def claude_fragen(konfig, positionen, indikatoren, barometer, nachrichten,
-                  regierung, blogs, sec):
+                  regierung, blogs, sec, tokenpreise=None):
     """
     Uebergibt die Tageslage an das claude-Kommandozeilenwerkzeug und laesst
     sie einordnen. Faellt still aus, wenn claude fehlt oder nicht antwortet.
@@ -1008,6 +1088,9 @@ Schlagzeilen mit Stichworttreffern:
 %s
 
 Regierungsvorhaben:
+%s
+
+Preis je Million Token (Ausgabe, US-Dollar) - der direkte Effizienzmesswert:
 %s
 
 Veroeffentlichungen der KI-Labore:
@@ -1133,6 +1216,12 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
             n["titel"][:150], n.get("quelle", ""))),
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
+        ("\n".join("  %-10s %-22s %s %5.2f Ausgabe%s"
+                    % (m["anbieter"], m["modell"], m.get("land", ""), m["ausgabe"],
+                       "  " + m["bemerkung"] if m.get("bemerkung") else "")
+                    for m in sorted((tokenpreise or {}).get("modelle", []),
+                                    key=lambda x: x["ausgabe"])[:10])
+         or "  (keine Preise hinterlegt)"),
         zeilen(blogs, 10, lambda b: "  [%s] %s" % (b["quelle"], b["titel"][:150])),
         zeilen(sec, 10, lambda s: "  %s %s%s%s" % (
             s.get("datum", ""), s["titel"][:130],
@@ -2681,6 +2770,35 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                     html_schuetzen(n.get("thema", "")), richtung,
                     html_schuetzen(", ".join(n["treffer"]))))
 
+    # ---- Token-Preise
+    token = (konfig.get("_tokenpreise") or {})
+    if token.get("modelle"):
+        v = token.get("veraenderung")
+        t.append("<h2>Preis je Million Token</h2>")
+        t.append('<div class="klein" style="margin-bottom:8px">Der direkte '
+                 'Messwert fuer die Effizienzseite der These. Fallen die Preise '
+                 'schnell, wird Rechenleistung entwertet.%s</div>'
+                 % (" Aenderung seit %s: <b>%+.1f%%</b>." % (token["vergleich"], v)
+                    if v is not None else " Noch kein Vergleichsstand."))
+        t.append("<div class='tabelle'><table><tr><th>Anbieter</th><th>Modell</th>"
+                 "<th>Land</th><th class='z'>Eingabe</th><th class='z'>Ausgabe</th>"
+                 "<th>Bemerkung</th></tr>")
+        for m in sorted(token["modelle"], key=lambda x: x["ausgabe"]):
+            t.append("<tr><td>%s</td><td>%s%s</td><td class='klein'>%s</td>"
+                     "<td class='z'>%.2f</td><td class='z'><b>%.2f</b></td>"
+                     "<td class='klein'>%s</td></tr>"
+                     % (html_schuetzen(m["anbieter"]), html_schuetzen(m["modell"]),
+                        " &#9733;" if m.get("spitzenklasse") else "",
+                        html_schuetzen(m.get("land", "")),
+                        m["eingabe"], m["ausgabe"],
+                        html_schuetzen(m.get("bemerkung", ""))))
+        t.append("</table></div>")
+        t.append('<div class="klein" style="margin-top:8px">Preise in US-Dollar je '
+                 'Million Token. Ein Stern kennzeichnet die Spitzenklasse, aus der '
+                 'der Durchschnitt gebildet wird. Stand der Liste: %s. Pflege ueber '
+                 '<code>tokenpreise</code> in der Konfiguration.</div>'
+                 % html_schuetzen(token.get("stand", "?")))
+
     # ---- Regierung
     t.append("<h2>Regierungsvorhaben (Federal Register)</h2>")
     if not regierung:
@@ -2813,6 +2931,10 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
 
     # Risikoaufschlag von der Notenbank, statt ihn aus Aktienkursen zu schaetzen
     zusatz = {}
+    token = tokenpreise_auswerten(konfig)
+    if token:
+        zusatz["tokenpreise"] = token
+
     reihe = fred_reihe(kennung)
     if len(reihe) > 25:
         jetzt = reihe[-1][1]
@@ -2896,7 +3018,8 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         claude_urteil = claude_letzte()      # letzte Einordnung weiterverwenden
     if mit_claude:
         claude_urteil = claude_fragen(konfig, positionen, indikatoren, barometer,
-                                      nachrichten, regierung, blogs, sec)
+                                      nachrichten, regierung, blogs, sec,
+                                      zusatz.get("tokenpreise"))
 
     if mit_claude:
         if claude_urteil and not claude_urteil.get("fehler"):
@@ -2929,7 +3052,7 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         "zusammenfassung": zusammenfassung,
         "nachrichten": nachrichten, "regierung": regierung, "blogs": blogs,
         "sec": sec, "alarme": alarme, "claude": claude_urteil, "fehler": fehler,
-        "verworfen": len(verworfen),
+        "verworfen": len(verworfen), "tokenpreise": zusatz.get("tokenpreise"),
     }
 
 
@@ -3250,6 +3373,167 @@ def ruhe_aktiv(konfig):
         return False
 
 
+def feste_schwellen_pruefen(konfig, positionen, indikatoren, termine):
+    """
+    Prueft harte Schwellen, ohne Claude zu fragen.
+
+    Die Einordnung laeuft nur zur vollen Stunde. Die Zwischenlaeufe haben
+    frische Kurse, konnten aber bisher nichts ausloesen - hier ist das Netz
+    darunter. Gibt eine Liste von Treffern zurueck.
+    """
+    einst = konfig.get("alarmschwellen") or {}
+    if not einst.get("aktiv"):
+        return []
+
+    fuer = einst.get("fuer_these", {})
+    gegen = einst.get("gegen_these", {})
+    struktur = einst.get("strukturell", {})
+    treffer = []
+
+    def merken(richtung, stufe, text, zahl):
+        treffer.append({"richtung": richtung, "stufe": stufe,
+                        "text": text, "zahl": zahl})
+
+    nach_name = {i["name"]: i for i in indikatoren}
+
+    for p in positionen:
+        name = "%s (%s)" % (p["name"], p.get("wkn", ""))
+        schein = p.get("schein_tag_prozent")
+        tag = p.get("tag_prozent")
+
+        if schein is not None and schein >= fuer.get("schein_gewinn_tag_prozent", 25):
+            merken("fuer", "hoch",
+                   "%s gewinnt heute %.1f Prozent" % (name, schein),
+                   "%s: %+.1f%% im Schein" % (p.get("wkn", ""), schein))
+        if schein is not None and schein <= -abs(gegen.get("schein_verlust_tag_prozent", 20)):
+            merken("gegen", "kritisch",
+                   "%s verliert heute %.1f Prozent" % (name, abs(schein)),
+                   "%s: %.1f%% im Schein" % (p.get("wkn", ""), schein))
+
+        if tag is not None and tag <= -abs(fuer.get("basiswert_sturz_tag_prozent", 8)):
+            merken("fuer", "hoch",
+                   "%s faellt um %.1f Prozent" % (p["ticker"], abs(tag)),
+                   "%s: %+.2f%%" % (p["ticker"], tag))
+        if tag is not None and tag >= fuer.get("basiswert_sturz_tag_prozent", 8):
+            merken("gegen", "kritisch",
+                   "%s steigt um %.1f Prozent" % (p["ticker"], tag),
+                   "%s: %+.2f%%" % (p["ticker"], tag))
+
+        abstand = p.get("abstand_verlustschwelle")
+        if abstand is not None and abstand > -abs(gegen.get("abstand_stop_unter_prozent", 12)):
+            merken("gegen", "kritisch",
+                   "%s ist nur noch %.1f Prozent von der Stop-Marke entfernt"
+                   % (name, abs(abstand)),
+                   "%s: %.1f%% bis Stop" % (p.get("wkn", ""), abstand))
+
+        puffer = p.get("barriere_abstand")
+        if puffer is not None and puffer < gegen.get("barriere_puffer_unter_prozent", 25):
+            merken("gegen", "kritisch",
+                   "%s hat nur noch %.1f Prozent Barriere-Puffer" % (name, puffer),
+                   "%s: Puffer %.1f%%" % (p.get("wkn", ""), puffer))
+
+        z = p.get("z_wert")
+        if (z is not None and abs(z) >= gegen.get("z_wert_ueber", 3.0)
+                and (tag or 0) > 0):
+            merken("gegen", "hoch",
+                   "%s bewegt sich das %.1f-fache der ueblichen Tagesschwankung "
+                   "gegen die Position" % (p["ticker"], abs(z)),
+                   "%s: Z = %.1f" % (p["ticker"], z))
+
+    aufschlag = nach_name.get("Hochzins-Risikoaufschlag")
+    if aufschlag:
+        monat = aufschlag.get("veraenderung_monat", 0.0)
+        if monat >= fuer.get("risikoaufschlag_monat_bp", 50):
+            merken("fuer", "kritisch",
+                   "Der Hochzins-Risikoaufschlag hat sich im Monat um %.0f "
+                   "Basispunkte ausgeweitet" % monat,
+                   "Risikoaufschlag: %.0f Bp (%+.0f im Monat)"
+                   % (aufschlag["wert"], monat))
+
+    vix = nach_name.get("VIX-Terminstruktur")
+    if vix and vix["wert"] > fuer.get("vix_struktur_ueber", 1.0):
+        merken("fuer", "hoch",
+               "Die Volatilitaets-Terminstruktur steht bei %.2f und damit in "
+               "Backwardation - akuter Marktstress" % vix["wert"],
+               "VIX / VIX3M: %.2f" % vix["wert"])
+
+    neo = nach_name.get("Neocloud-Relativstaerke")
+    if neo and neo["wert"] <= fuer.get("neocloud_relativstaerke_unter", -15):
+        merken("fuer", "hoch",
+               "Die Neoclouds liegen %.1f Punkte hinter dem Nasdaq - die "
+               "schuldenfinanzierte Seite bricht zuerst" % abs(neo["wert"]),
+               "Neocloud-Relativstaerke: %.1f Punkte" % neo["wert"])
+
+    heute = date.today()
+    for termin in termine:
+        try:
+            tag_ = datetime.strptime(termin["datum"], "%Y-%m-%d").date()
+        except (ValueError, KeyError):
+            continue
+        rest = (tag_ - heute).days
+        if 0 <= rest <= struktur.get("termin_in_tagen", 1):
+            merken("neutral", "hoch",
+                   "Termin %s: %s" % ("heute" if rest == 0 else "morgen",
+                                      termin["was"]),
+                   termin["was"])
+
+    if konfig.get("zeitlimit_bis"):
+        try:
+            limit = datetime.strptime(konfig["zeitlimit_bis"], "%Y-%m-%d").date()
+            rest = (limit - heute).days
+            if 0 <= rest <= struktur.get("zeitlimit_in_tagen", 3):
+                merken("neutral", "hoch",
+                       "Das Zeitlimit ist in %d Tagen erreicht" % rest,
+                       "Zeitlimit: %s" % limit.strftime("%d.%m."))
+        except ValueError:
+            pass
+
+    return treffer
+
+
+def schwellen_alarm(konfig, d, zustand):
+    """Baut aus den Schwellentreffern eine Eilmeldung und verschickt sie."""
+    treffer = feste_schwellen_pruefen(konfig, d.get("positionen", []),
+                                      d.get("indikatoren", []),
+                                      konfig.get("termine", []))
+    if not treffer:
+        return False
+
+    kritisch = any(t["stufe"] == "kritisch" for t in treffer)
+    dafuer = [t for t in treffer if t["richtung"] == "fuer"]
+    dagegen = [t for t in treffer if t["richtung"] == "gegen"]
+    haupt = (dagegen or dafuer or treffer)[0]
+
+    if dagegen:
+        warum = ("Die Position ist unter Druck. Das ist keine Deutung, sondern "
+                 "eine gerissene Schwelle - pruefe, ob deine Ausstiegsregel greift.")
+        schritte = ("Position pruefen, Stop-Marke nachziehen, oder bewusst "
+                    "aussitzen. Der Bericht zeigt die Zahlen dazu.")
+    elif dafuer:
+        warum = ("Das Umfeld arbeitet gerade stark fuer die These. Eine "
+                 "Gewinnmitnahme oder das Nachziehen der Stop-Marke waere zu "
+                 "erwaegen.")
+        schritte = ("Teilgewinn mitnehmen, Stop nachziehen, oder laufen lassen "
+                    "bis zum Zeitlimit.")
+    else:
+        warum = "Ein hinterlegter Termin steht an."
+        schritte = "Vorher entscheiden, ob die Position ueber den Termin laeuft."
+
+    d = dict(d)
+    d["claude"] = {"eilmeldung": {
+        "noetig": True,
+        "stufe": "kritisch" if kritisch else "hoch",
+        "ausloeser": "Feste Schwelle, ohne Einordnung ausgeloest",
+        "betreff": haupt["text"][:70],
+        "schlagzeile": haupt["text"],
+        "was_geschehen_ist": " ".join(t["text"] + "." for t in treffer[:4]),
+        "warum_es_zaehlt": warum,
+        "was_du_tun_koenntest": schritte,
+        "zahlen": [t["zahl"] for t in treffer[:6]],
+    }}
+    return eilmeldung_verschicken(konfig, d, zustand)
+
+
 def eilmeldung_verschicken(konfig, d, zustand):
     """
     Sofortmail bei Ereignissen, die nicht bis zum Abendbericht warten koennen.
@@ -3272,7 +3556,7 @@ def eilmeldung_verschicken(konfig, d, zustand):
         return False
 
     # Nicht zweimal dasselbe. Der Betreff dient als Erkennungsmerkmal.
-    kennung = (eil.get("betreff") or "")[:90]
+    kennung = "%s|%s" % (date.today().isoformat(), (eil.get("betreff") or "")[:80])
     gesendet = zustand.get("eilmeldungen", [])
     if kennung and kennung in gesendet:
         log_schreiben("Eilmeldung schon verschickt: %s" % kennung[:60])
@@ -3578,6 +3862,7 @@ def claude_letzte():
 def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None,
                       fuer_mail=False, nur_web=False):
     konfig["_verworfen"] = d.get("verworfen", 0)
+    konfig["_tokenpreise"] = d.get("tokenpreise")
     archiv_name = datetime.now().strftime("%Y-%m-%d-%H%M.html")
     # Zwischenlaeufe schreiben keinen Archiveintrag. Wuerde die Startseite
     # trotzdem einen Dateinamen nennen, faende sich die Navigation nicht in
@@ -3693,6 +3978,7 @@ def main():
     if modus == "watch":
         frisch = neue_alarme(d["alarme"], zustand)
         melden(konfig, frisch)
+        schwellen_alarm(konfig, d, zustand)
         # Nur wenn wirklich etwas Neues von Alarmstufe vorliegt, wird Claude
         # zur Einschaetzung gefragt - sonst liefe bei jedem Lauf eine Anfrage.
         echte = [t for stufe, t in frisch if stufe == "alarm"]
@@ -3725,7 +4011,10 @@ def main():
         if modus == "web":
             frisch = neue_alarme(d["alarme"], zustand)
             echte = [t for stufe, t in frisch if stufe == "alarm"]
-            if (echte and mit_claude and d.get("claude")
+            # Feste Schwellen greifen in JEDEM Lauf, auch ohne Einordnung -
+            # sonst koennte zwischen zwei vollen Stunden nichts alarmieren.
+            geschwellt = schwellen_alarm(konfig, d, zustand)
+            if (not geschwellt and echte and mit_claude and d.get("claude")
                     and not d["claude"].get("fehler")):
                 eilmeldung_verschicken(konfig, d, zustand)
             log_schreiben("web%s: Barometer %d, %d Auffaelligkeiten (%d neu), "
@@ -3740,7 +4029,8 @@ def main():
         except (TypeError, ValueError) as f:
             log_schreiben("Hinweis: Daten nicht sicherbar (%s)" % f)
         if modus == "report":
-            eilmeldung_verschicken(konfig, d, zustand)
+            if not schwellen_alarm(konfig, d, zustand):
+                eilmeldung_verschicken(konfig, d, zustand)
             bericht_mailen(konfig, d)
             zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
         if modus == "web":
