@@ -55,6 +55,20 @@ Schalter:
   Sammelzeit — praktisch, wenn nur der Text nicht überzeugt.
 - `--ohne-claude` — die Einordnung überspringen
 
+## Aufbau
+
+Der Bericht ist zweispaltig. **Links** läuft der Inhalt durch: Barometer,
+Wertverlauf, Zusammenfassung, Auffälligkeiten, Positionen, Indikatoren, Gruppen,
+Nachrichten, Termine. **Rechts** steht eine feste Spalte mit den Kennzahlen, die
+den Zustand des Systems beschreiben statt der Richtung einzelner Werte — sie
+bleibt beim Scrollen stehen.
+
+Ganz oben in dieser Spalte der **Kreditrisiko-Aufschlag**: Eine Blase platzt über
+die Finanzierung, dort zeigt sie sich zuerst. Darunter VIX-Terminstruktur,
+Konzentrations-Spread und die Monatsveränderung je Gruppe.
+
+Unter 1080 Pixel Fensterbreite rutscht die rechte Spalte unter den Inhalt.
+
 ## Was beobachtet wird
 
 **Wertverlauf ganz oben** — zwei Linien mit dem Eurowert beider Positionen, zum

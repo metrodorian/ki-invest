@@ -1417,7 +1417,15 @@ STIL = """
 *{box-sizing:border-box}
 body{margin:0;padding:28px 20px 60px;background:var(--grund);color:var(--text);
  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.huelle{max-width:1080px;margin:0 auto}
+.seite{max-width:1440px;margin:0 auto;display:grid;
+ grid-template-columns:minmax(0,1fr) 304px;gap:22px;align-items:start}
+.inhalt{min-width:0}
+.rand{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow-y:auto;
+ scrollbar-width:thin}
+@media(max-width:1080px){
+ .seite{grid-template-columns:1fr}
+ .rand{position:static;max-height:none}
+}
 h1{font-size:24px;margin:2px 0 2px;letter-spacing:-.01em}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
  color:var(--gedaempft);margin:34px 0 12px;font-weight:600}
@@ -1483,10 +1491,8 @@ ul.liste li:last-child{border-bottom:none}
  padding-top:11px;margin:13px 0 10px;font-weight:600}
 .fazit p.gemessen{font-size:14px;color:var(--gedaempft);line-height:1.55}
 .fazit p.gemessen b{color:var(--text);font-weight:600}
-.oben{display:grid;grid-template-columns:1fr 292px;gap:14px;align-items:start;
- margin-bottom:4px}
 .kernbox{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
- padding:15px 16px;box-shadow:var(--schatten);position:sticky;top:14px}
+ padding:15px 16px;box-shadow:var(--schatten)}
 .kern-titel{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
  color:var(--gedaempft);font-weight:700;margin-bottom:5px}
 .kern-haupt{padding-bottom:13px;border-bottom:1px solid var(--rand)}
@@ -1503,7 +1509,7 @@ ul.liste li:last-child{border-bottom:none}
 .kern-tab tr:last-child td{border-bottom:none}
 .kern-tab td.z{text-align:right;font-variant-numeric:tabular-nums;font-weight:650;
  white-space:nowrap}
-@media(max-width:900px){.oben{grid-template-columns:1fr}.kernbox{position:static}}
+
 .wertkarte{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
  padding:14px 16px 12px;margin:16px 0 4px;box-shadow:var(--schatten)}
 .wertchart{display:block;width:100%;height:auto;overflow:visible}
@@ -1562,7 +1568,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     t.append('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
              '<meta name="viewport" content="width=device-width,initial-scale=1">'
              '<title>KI-Invest Monitor</title><style>%s</style></head>'
-             '<body><div class="huelle">' % STIL)
+             '<body><div class="seite"><div class="inhalt">' % STIL)
 
     t.append('<div class="kopf">%s%s</div><h1>KI-Invest Monitor</h1>'
              % (jetzt.strftime("%A, %d.%m.%Y, %H:%M Uhr"), limit_text))
@@ -1597,7 +1603,6 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     if claude_urteil and not claude_urteil.get("fehler"):
         claude_saetze = claude_urteil.get("zusammenfassung") or []
 
-    t.append('<div class="oben">')
     if claude_saetze or zusammenfassung:
         t.append('<div class="fazit">')
         if claude_saetze:
@@ -1609,8 +1614,6 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
             t.append('<p class="%s">%s</p>'
                      % ("gemessen" if claude_saetze else "", satz))
         t.append("</div>")
-    t.append(kernbox(indikatoren, gruppen_ansicht))
-    t.append("</div>")
 
     # ---- Claude
     if claude_urteil:
@@ -1910,7 +1913,10 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              'der Orderausfuehrung. Die Stichwort-Einordnung ist eine grobe '
              'Vorsortierung &ndash; die Bewertung bleibt bei dir. '
              'Konfiguration: <code>monitor/config.json</code>.</div>')
-    t.append("</div></body></html>")
+    t.append("</div>")                              # Ende .inhalt
+    t.append('<aside class="rand">%s</aside>'
+             % kernbox(indikatoren, gruppen_ansicht))
+    t.append("</div></body></html>")                # Ende .seite
     return "\n".join(t)
 
 
