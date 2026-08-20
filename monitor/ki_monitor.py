@@ -1415,8 +1415,139 @@ STEUERUNG = """
            maxlength="200" autocomplete="off">
     <button type="button" data-aktion="notiz" class="leise">Merken</button>
   </div>
+  <button type="button" id="mehroeffnen" class="leise">Weitere Aktionen &hellip;</button>
   <div class="rueckmeldung" id="rueckmeldung" hidden></div>
 </div>
+
+<dialog id="mehrfenster" class="mehrfenster">
+  <div class="mf-kopf">
+    <b>Weitere Aktionen</b>
+    <button type="button" id="mehrzu" aria-label="Schliessen">&times;</button>
+  </div>
+
+  <div class="mf-block">
+    <div class="mf-titel">Auskunft</div>
+    <div class="mf-reihe">
+      <button type="button" data-info="status">Status</button>
+      <button type="button" data-info="kurse">Kurse</button>
+      <button type="button" data-info="termine">Termine</button>
+    </div>
+    <div class="mf-ausgabe" id="mf-ausgabe" hidden></div>
+  </div>
+
+  <div class="mf-block">
+    <div class="mf-titel">Reset-Barrieren nachtragen</div>
+    <div class="mf-hinweis" id="mf-barrierestand"></div>
+    <div class="mf-reihe">
+      <input type="text" id="mf-barriere" placeholder="324.00 421.08" autocomplete="off">
+      <button type="button" id="mf-barriere-los">Setzen</button>
+    </div>
+  </div>
+
+  <div class="mf-block">
+    <div class="mf-titel">Positionen</div>
+    <div class="mf-reihe" id="mf-positionen"></div>
+    <div class="mf-hinweis">Als geschlossen markierte Positionen werden nicht
+     mehr bewertet und loesen keine Alarme aus. Nochmal tippen macht es rueckgaengig.</div>
+  </div>
+
+  <div class="mf-block">
+    <div class="mf-titel">Senden</div>
+    <div class="mf-reihe">
+      <button type="button" data-aktion2="telegram-bericht">Bericht per Telegram</button>
+      <button type="button" data-aktion2="probealarm">Probealarm</button>
+    </div>
+  </div>
+
+  <div class="rueckmeldung" id="mf-meldung" hidden></div>
+</dialog>
+
+<script>
+(function () {
+  var fenster = document.getElementById("mehrfenster");
+  var ausgabe = document.getElementById("mf-ausgabe");
+  var meldung = document.getElementById("mf-meldung");
+  var stand = document.getElementById("mf-barrierestand");
+  var liste = document.getElementById("mf-positionen");
+  var feld = document.getElementById("mf-barriere");
+
+  function sagen(text, gut) {
+    meldung.textContent = text;
+    meldung.className = "rueckmeldung " + (gut === false ? "schlecht" : "gut");
+    meldung.hidden = false;
+    setTimeout(function () { meldung.hidden = true; }, 9000);
+  }
+
+  function holen(ziel) {
+    return fetch(ziel, { cache: "no-store" }).then(function (a) { return a.json(); });
+  }
+
+  function positionenLaden() {
+    holen("/aktion/positionen").then(function (z) {
+      liste.innerHTML = "";
+      var teile = [];
+      (z.positionen || []).forEach(function (p) {
+        var k = document.createElement("button");
+        k.type = "button";
+        k.textContent = p.wkn + (p.geschlossen ? " \u2013 geschlossen" : "");
+        k.className = p.geschlossen ? "zu" : "";
+        k.onclick = function () {
+          holen("/aktion/verkauft?wkn=" + encodeURIComponent(p.wkn))
+            .then(function (r) { sagen(r.text, r.ok); positionenLaden(); });
+        };
+        liste.appendChild(k);
+        teile.push(p.wkn + " " + (p.barriere || 0).toFixed(2)
+                   + " (Stand " + (p.stand || "?") + ")");
+        if (!feld.value) {
+          feld.placeholder = (z.positionen || [])
+            .map(function (x) { return (x.barriere || 0).toFixed(2); }).join(" ");
+        }
+      });
+      stand.textContent = "Aktuell: " + teile.join(", ");
+    });
+  }
+
+  document.getElementById("mehroeffnen").onclick = function () {
+    positionenLaden();
+    ausgabe.hidden = true;
+    if (fenster.showModal) { fenster.showModal(); } else { fenster.setAttribute("open", ""); }
+  };
+  document.getElementById("mehrzu").onclick = function () {
+    if (fenster.close) { fenster.close(); } else { fenster.removeAttribute("open"); }
+  };
+  fenster.addEventListener("click", function (e) {
+    if (e.target === fenster) { fenster.close(); }
+  });
+
+  fenster.addEventListener("click", function (e) {
+    var k = e.target.closest("button[data-info]");
+    if (k) {
+      ausgabe.hidden = false;
+      ausgabe.innerHTML = "wird geholt \u2026";
+      holen("/aktion/info?was=" + k.dataset.info).then(function (z) {
+        ausgabe.innerHTML = z.ok ? z.html : (z.text || "Nicht abrufbar.");
+      });
+      return;
+    }
+    var a = e.target.closest("button[data-aktion2]");
+    if (a) {
+      a.disabled = true;
+      holen("/aktion/" + a.dataset.aktion2)
+        .then(function (z) { sagen(z.text, z.ok); })
+        .finally(function () { a.disabled = false; });
+    }
+  });
+
+  document.getElementById("mf-barriere-los").onclick = function () {
+    var wert = feld.value.trim() || feld.placeholder;
+    holen("/aktion/barriere?werte=" + encodeURIComponent(wert))
+      .then(function (z) { sagen(z.text, z.ok); if (z.ok) { positionenLaden(); } });
+  };
+  feld.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { document.getElementById("mf-barriere-los").click(); }
+  });
+})();
+</script>
 <script>
 (function () {
   var block = document.getElementById("steuerung");
@@ -1499,13 +1630,10 @@ def kernbox(indikatoren, gruppen_ansicht):
                  '<div class="kernskala"><i style="left:calc(%.1f%% - 1px)"></i></div>'
                  '<div class="kernskala-marken"><span>-3 Risikofreude</span>'
                  '<span>0</span><span>+3 Stress</span></div>'
-                 '<div class="kern-hinweis">Wie weit Hochzinsanleihen hinter '
-                 'erster Bonitaet zurueckbleiben, ueber einen Monat. '
-                 '<b>Steigt er, wird die Refinanzierung der schuldenfinanzierten '
-                 'Rechenzentrumsbauer teuer</b> &ndash; das stuetzt die These. '
-                 'Faellt er, ist Geld billig und der Ausbau laeuft weiter. '
-                 'Eine Blase platzt ueber die Finanzierung, nicht ueber die '
-                 'Stimmung &ndash; hier zeigt sie sich zuerst.</div></div>'
+                 '<div class="kern-hinweis">Hochzins gegen erste Bonitaet, '
+                 '1 Monat. <b>Steigt er, wird Refinanzierung teuer</b> &ndash; '
+                 'das stuetzt die These. Eine Blase platzt ueber die '
+                 'Finanzierung.</div></div>'
                  % (klasse, haupt["wert"], anteil * 100))
 
     weitere = [nach_name[n] for n in KERNINDIKATOREN[1:] if n in nach_name]
@@ -1880,6 +2008,35 @@ ul.liste li:last-child{border-bottom:none}
 .rueckmeldung[hidden]{display:none !important}
 .rueckmeldung.gut{background:rgba(21,128,61,.12);color:var(--gut)}
 .rueckmeldung.schlecht{background:rgba(185,28,28,.12);color:var(--schlecht)}
+.mehrfenster{border:1px solid var(--rand);border-radius:14px;padding:0;
+ max-width:520px;width:calc(100vw - 32px);background:var(--flaeche);
+ color:var(--text);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.mehrfenster::backdrop{background:rgba(0,0,0,.45)}
+.mf-kopf{display:flex;justify-content:space-between;align-items:center;
+ padding:15px 18px;border-bottom:1px solid var(--rand);font-size:15px}
+.mf-kopf button{background:none;border:none;color:var(--gedaempft);font-size:22px;
+ line-height:1;cursor:pointer;padding:0 4px}
+.mf-kopf button:hover{color:var(--text)}
+.mf-block{padding:14px 18px;border-bottom:1px solid var(--rand)}
+.mf-block:last-of-type{border-bottom:none}
+.mf-titel{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+ color:var(--gedaempft);font-weight:700;margin-bottom:8px}
+.mf-hinweis{font-size:11.5px;color:var(--gedaempft);line-height:1.45;margin:6px 0}
+.mf-reihe{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mf-reihe button{font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+ background:var(--flaeche2);color:var(--text);border:1px solid var(--rand);
+ border-radius:8px;padding:8px 13px}
+.mf-reihe button:hover:not(:disabled){border-color:var(--akzent);color:var(--akzent)}
+.mf-reihe button:disabled{opacity:.5;cursor:default}
+.mf-reihe button.zu{background:var(--warn);color:#fff;border-color:transparent}
+.mf-reihe input{flex:1;min-width:140px;font:inherit;font-size:13px;
+ background:var(--grund);color:var(--text);border:1px solid var(--rand);
+ border-radius:8px;padding:8px 11px}
+.mf-ausgabe{margin-top:10px;padding:11px 13px;background:var(--grund);
+ border:1px solid var(--rand);border-radius:9px;font-size:12.5px;line-height:1.6;
+ max-height:260px;overflow-y:auto;white-space:pre-line}
+.mf-ausgabe[hidden]{display:none !important}
+.mehrfenster .rueckmeldung{margin:0 18px 16px}
 
 .wertkarte{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
  padding:14px 16px 12px;margin:16px 0 4px;box-shadow:var(--schatten)}

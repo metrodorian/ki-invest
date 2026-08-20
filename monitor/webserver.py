@@ -92,6 +92,80 @@ class Handler(SimpleHTTPRequestHandler):
         werte = urllib.parse.parse_qs(zerlegt.query)
         konfig = konfig_lesen()
 
+        # --- Auskuenfte: dieselben Texte wie im Telegram-Chat
+        if was == "info":
+            welche = (werte.get("was") or [""])[0]
+            try:
+                sys.path.insert(0, BASIS)
+                import telegram_bot as tb
+                text = {"status": tb.antwort_status,
+                        "kurse": tb.antwort_kurse,
+                        "termine": tb.antwort_termine}[welche](konfig)
+                return self.antwort({"ok": True, "html": text})
+            except Exception as fehler:                          # noqa: BLE001
+                return self.antwort({"ok": False,
+                                     "text": "Nicht abrufbar: %s" % str(fehler)[:150]})
+
+        if was == "barriere":
+            roh = (werte.get("werte") or [""])[0]
+            zahlen = []
+            for stueck in roh.replace(",", ".").replace(";", " ").split():
+                try:
+                    zahlen.append(float(stueck))
+                except ValueError:
+                    pass
+            positionen = konfig.get("positionen", [])
+            if len(zahlen) != len(positionen):
+                return self.antwort({"ok": False,
+                                     "text": "Ich brauche %d Werte in der "
+                                             "Reihenfolge %s."
+                                             % (len(positionen),
+                                                ", ".join(p.get("wkn", "?")
+                                                          for p in positionen))})
+            heute = datetime.now().strftime("%Y-%m-%d")
+            teile = []
+            for pos, neu in zip(positionen, zahlen):
+                teile.append("%s %.2f \u2192 %.2f" % (pos.get("wkn", "?"),
+                                                       pos.get("barriere") or 0, neu))
+                pos["barriere"] = neu
+                pos["barriere_stand"] = heute
+            konfig_schreiben(konfig)
+            return self.antwort({"ok": True,
+                                 "text": "Barrieren aktualisiert: " + ", ".join(teile)})
+
+        if was == "verkauft":
+            kennung = (werte.get("wkn") or [""])[0].upper()
+            for pos in konfig.get("positionen", []):
+                if pos.get("wkn", "").upper() == kennung:
+                    if pos.get("geschlossen"):
+                        pos.pop("geschlossen", None)
+                        antwort = "%s ist wieder offen." % kennung
+                    else:
+                        pos["geschlossen"] = datetime.now().strftime("%Y-%m-%d")
+                        antwort = ("%s als geschlossen markiert. Sie wird nicht "
+                                   "mehr bewertet." % kennung)
+                    konfig_schreiben(konfig)
+                    return self.antwort({"ok": True, "text": antwort})
+            return self.antwort({"ok": False, "text": "Unbekannt: %s" % kennung})
+
+        if was == "telegram-bericht":
+            im_hintergrund(sys.executable, "-c",
+                           "import sys; sys.path.insert(0, %r);"
+                           "import telegram_bot as tb;"
+                           "c = tb.konfig_laden();"
+                           "tb.datei_senden(c, %r, 'Bericht auf Anforderung')"
+                           % (BASIS, os.path.join(BASIS, "bericht.html")))
+            return self.antwort({"ok": True,
+                                 "text": "Bericht geht per Telegram raus."})
+
+        if was == "positionen":
+            return self.antwort({"ok": True, "positionen": [
+                {"wkn": p.get("wkn"), "name": p.get("name"),
+                 "barriere": p.get("barriere"),
+                 "stand": p.get("barriere_stand"),
+                 "geschlossen": bool(p.get("geschlossen"))}
+                for p in konfig.get("positionen", [])]})
+
         if was == "zustand":
             ruhe = ruhe_aktiv(konfig)
             notiz = konfig.get("notiz") or {}
