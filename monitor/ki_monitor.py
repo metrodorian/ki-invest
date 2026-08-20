@@ -358,10 +358,12 @@ def indikatoren_bauen(kurse, gruppen):
             "wert": rs,
             "einheit": "%-Pkt vs Nasdaq (1 Monat)",
             "erklaerung": "SMIC, Cambricon und Hua Hong an ihren Heimatboersen. "
-                          "Hier zeigt sich, ob Chinas eigene Hardware wirklich "
-                          "vorankommt - der Kern der These, den die "
-                          "Plattformwerte nicht abbilden.",
-            "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
+                          "Nur zur Kenntnis, nicht als Richtungssignal: Die These "
+                          "behauptet Effizienz durch bessere Modelle, nicht eigene "
+                          "Fabriken. Schwaeche hier ist mit ihr sogar vereinbar - "
+                          "gute Modelle auf schwaecheren Chips ist genau der "
+                          "DeepSeek-Fall.",
+            "these": "neutral",
         })
 
     # --- Kreditrisiko sauber isoliert
@@ -419,7 +421,6 @@ def barometer_rechnen(indikatoren, nachrichten):
         "Chips gegen Hyperscaler": 1.2,
         "Konzentrations-Spread": 1.0,
         "China-KI-Relativstaerke": 1.0,
-        "China-Chipfertigung": 1.0,
         "Strom-Relativstaerke": 0.8,
         "Kreditrisiko-Aufschlag": 1.0,
         "Hochzins-Kredite (HYG)": 0.7,
@@ -430,7 +431,7 @@ def barometer_rechnen(indikatoren, nachrichten):
         if gewicht is None:
             continue
         roh = ind["wert"]
-        if ind["name"] in ("China-KI-Relativstaerke", "China-Chipfertigung"):
+        if ind["name"] == "China-KI-Relativstaerke":
             roh = -roh          # dort ist Staerke gut fuer die These
         # -10 bis +10 Prozentpunkte auf -1..+1 abbilden, Vorzeichen drehen
         normiert = max(-1.0, min(1.0, -roh / 10.0))
@@ -814,6 +815,19 @@ Veroeffentlichungen der KI-Labore:
 
 SEC-Meldungen (8-K):
 %s
+
+ZWEI CHINA-MASSE, DIE VERSCHIEDENES MESSEN
+Verwechsle sie nicht. Die These lautet: China gewinnt durch EFFIZIENZ - bessere
+Modelle mit weniger Rechenleistung, wie beim DeepSeek-Moment. Sie lautet NICHT:
+China baut eigene Fabriken.
+
+- "China-KI-Relativstaerke" (Alibaba/Qwen, Tencent/Hunyuan, SenseTime, iFlytek,
+  Kingsoft Cloud, Baidu/Ernie) misst die Modellseite. DAS ist der Kern der These.
+- "China-Chipfertigung" (SMIC, Cambricon, Hua Hong) misst die Hardwareseite.
+  Schwaeche dort widerlegt die These NICHT - sie ist sogar mit ihr vereinbar:
+  bessere Modelle auf schwaecheren Chips ist genau die Behauptung.
+
+Wenn beide auseinanderlaufen, benenne das als Befund statt es zu verrechnen.
 
 AUFGABE
 Ordne die Lage ein. Achte besonders auf Dinge, die ein Stichwortfilter falsch
@@ -1291,6 +1305,76 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
                 "gerechnet und kann vom Depot abweichen.")))
 
 
+KERNINDIKATOREN = ["Kreditrisiko-Aufschlag", "VIX-Terminstruktur",
+                   "Konzentrations-Spread"]
+
+
+def kernbox(indikatoren, gruppen_ansicht):
+    """
+    Schmale Spalte mit den Kennzahlen, die den Zustand des Systems beschreiben -
+    nicht die Richtung einzelner Werte. Der Kreditrisiko-Aufschlag steht oben:
+    Blasen platzen ueber die Finanzierung, nicht ueber die Stimmung.
+    """
+    nach_name = {i["name"]: i for i in indikatoren}
+    t = ['<aside class="kernbox">']
+
+    haupt = nach_name.get("Kreditrisiko-Aufschlag")
+    if haupt:
+        klasse = ("gut" if haupt["these"] == "gut"
+                  else "schlecht" if haupt["these"] == "schlecht" else "neutral")
+        t.append('<div class="kern-haupt"><div class="kern-titel">Kreditrisiko-Aufschlag</div>'
+                 '<div class="kern-wert %s">%+.2f</div>'
+                 '<div class="kern-hinweis">Hochzins gegen erste Bonitaet, 1 Monat. '
+                 'Faellt er deutlich, wird die Refinanzierung der schuldenfinanzierten '
+                 'Rechenzentrumsbauer teuer. <b>Eine Blase platzt ueber die '
+                 'Finanzierung</b> &ndash; hier zeigt sie sich zuerst.</div></div>'
+                 % (klasse, haupt["wert"]))
+
+    weitere = [nach_name[n] for n in KERNINDIKATOREN[1:] if n in nach_name]
+    if weitere:
+        t.append('<div class="kern-liste">')
+        for i in weitere:
+            klasse = ("gut" if i["these"] == "gut"
+                      else "schlecht" if i["these"] == "schlecht" else "neutral")
+            nk = i.get("nachkomma", 2)
+            t.append('<div class="kern-zeile"><span>%s</span>'
+                     '<b class="%s">%s</b></div>'
+                     % (i["name"], klasse, ("%." + str(nk) + "f") % i["wert"]))
+        t.append("</div>")
+
+    # Gruppen nach Monatsveraenderung
+    # Bei fast allen Gruppen ist ein Anstieg schlecht fuer die Short-These.
+    # Umgekehrt bei den chinesischen KI-Firmen: dort ist Staerke die
+    # Bestaetigung. Die Farbe muss dieser Richtung folgen.
+    UEBERSPRINGEN = ("Markt und Stress", "China Chipfertigung")
+    UMGEKEHRT = ("China KI-Modelle und Software",)
+
+    zeilen = []
+    for name, info in gruppen_ansicht:
+        if name in UEBERSPRINGEN:
+            continue
+        werte = [w.get("monat_prozent") for w in info["werte"]
+                 if w.get("monat_prozent") is not None]
+        if werte:
+            zeilen.append((name, sum(werte) / len(werte), name in UMGEKEHRT))
+    if zeilen:
+        zeilen.sort(key=lambda z: -z[1])
+        t.append('<div class="kern-titel" style="margin-top:16px">Gruppen, 1 Monat</div>'
+                 '<table class="kern-tab">')
+        for name, wert, umgekehrt in zeilen:
+            t.append('<tr><td>%s</td><td class="z %s">%+.1f%%</td></tr>'
+                     % (name, klasse_fuer(wert, umgekehrt), wert))
+        t.append('</table><div class="kern-hinweis">Mittel der Gruppe gegenueber '
+                 'dem Vormonat. Rot heisst gegen die These. Bei den chinesischen '
+                 'KI-Firmen ist es umgekehrt: Staerke dort <b>stuetzt</b> die '
+                 'These. Steht oben, wer das Geld ausgibt, und unten, wer es '
+                 'einnimmt, verteilt der Markt die Marge um &ndash; das ist etwas '
+                 'anderes als ein platzender Ausbau.</div>')
+
+    t.append("</aside>")
+    return "".join(t)
+
+
 def barometer_verlauf_balken(verlauf):
     """Balkenreihe der letzten Barometer-Staende. Der Trend sagt mehr als der Stand."""
     if not verlauf or len(verlauf) < 2:
@@ -1399,6 +1483,27 @@ ul.liste li:last-child{border-bottom:none}
  padding-top:11px;margin:13px 0 10px;font-weight:600}
 .fazit p.gemessen{font-size:14px;color:var(--gedaempft);line-height:1.55}
 .fazit p.gemessen b{color:var(--text);font-weight:600}
+.oben{display:grid;grid-template-columns:1fr 292px;gap:14px;align-items:start;
+ margin-bottom:4px}
+.kernbox{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
+ padding:15px 16px;box-shadow:var(--schatten);position:sticky;top:14px}
+.kern-titel{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+ color:var(--gedaempft);font-weight:700;margin-bottom:5px}
+.kern-haupt{padding-bottom:13px;border-bottom:1px solid var(--rand)}
+.kern-wert{font-size:31px;font-weight:650;line-height:1.05;letter-spacing:-.02em;
+ font-variant-numeric:tabular-nums;margin-bottom:5px}
+.kern-hinweis{font-size:11.5px;color:var(--gedaempft);line-height:1.45}
+.kern-liste{padding:11px 0;border-bottom:1px solid var(--rand)}
+.kern-zeile{display:flex;justify-content:space-between;align-items:baseline;
+ font-size:12.5px;padding:3px 0;gap:10px}
+.kern-zeile b{font-variant-numeric:tabular-nums;font-weight:650}
+.kern-tab{width:100%;border-collapse:collapse;font-size:12.5px;background:none;
+ box-shadow:none;margin-bottom:9px}
+.kern-tab td{padding:4px 0;border-bottom:1px solid var(--rand)}
+.kern-tab tr:last-child td{border-bottom:none}
+.kern-tab td.z{text-align:right;font-variant-numeric:tabular-nums;font-weight:650;
+ white-space:nowrap}
+@media(max-width:900px){.oben{grid-template-columns:1fr}.kernbox{position:static}}
 .wertkarte{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
  padding:14px 16px 12px;margin:16px 0 4px;box-shadow:var(--schatten)}
 .wertchart{display:block;width:100%;height:auto;overflow:visible}
@@ -1492,6 +1597,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     if claude_urteil and not claude_urteil.get("fehler"):
         claude_saetze = claude_urteil.get("zusammenfassung") or []
 
+    t.append('<div class="oben">')
     if claude_saetze or zusammenfassung:
         t.append('<div class="fazit">')
         if claude_saetze:
@@ -1503,6 +1609,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
             t.append('<p class="%s">%s</p>'
                      % ("gemessen" if claude_saetze else "", satz))
         t.append("</div>")
+    t.append(kernbox(indikatoren, gruppen_ansicht))
+    t.append("</div>")
 
     # ---- Claude
     if claude_urteil:
