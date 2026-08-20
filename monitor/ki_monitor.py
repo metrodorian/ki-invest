@@ -213,6 +213,34 @@ def scheinkurs_holen(isin, kennung):
                               if (geld and brief) else None}
 
 
+def fred_reihe(kennung, reihe="BAMLH0A0HYM2", tage=140):
+    """
+    Holt eine Zeitreihe der US-Notenbank von St. Louis.
+
+    Die Voreinstellung ist der optionsbereinigte Risikoaufschlag fuer
+    US-Hochzinsanleihen - der Preis, den schlechte Schuldner ueber sichere
+    zahlen muessen. Anders als ein Vergleich zweier Aktienkurse ist das die
+    Groesse selbst, in Basispunkten, mit eindeutiger Richtung: steigt sie,
+    wird Fremdkapital teurer.
+    """
+    url = ("https://fred.stlouisfed.org/graph/fredgraph.csv?id=%s&cosd=%s"
+           % (reihe, (date.today() - timedelta(days=tage)).isoformat()))
+    try:
+        roh = abrufen(url, kennung, versuche=2).decode("utf-8", "ignore")
+    except IOError:
+        return []
+    werte = []
+    for zeile in roh.strip().splitlines()[1:]:
+        teile = zeile.split(",")
+        if len(teile) < 2 or teile[1] in (".", ""):
+            continue
+        try:
+            werte.append((teile[0], float(teile[1])))
+        except ValueError:
+            continue
+    return werte
+
+
 def position_auswerten(position, kurs):
     faktor = position.get("faktor", -2)
     ergebnis = dict(position)
@@ -246,6 +274,14 @@ def position_auswerten(position, kurs):
     ergebnis["drag_woche_prozent"] = (
         exp(0.5 * faktor * (1 - faktor) * sigma * sigma * (7.0 / 365.0)) - 1.0) * 100.0
 
+    # Abstand zur Verlustschwelle: der Barrierepuffer sagt darueber nichts,
+    # weil der Stop lange vor der Barriere greift.
+    ergebnis["abstand_verlustschwelle"] = None
+    stop = position.get("stop_schein")
+    jetzt_schein = position.get("kurs_aktuell")
+    if stop and jetzt_schein:
+        ergebnis["abstand_verlustschwelle"] = (stop / jetzt_schein - 1.0) * 100.0
+
     ergebnis["haltetage"] = None
     ergebnis["drag_prozent"] = None
     if position.get("einstieg_datum"):
@@ -270,7 +306,7 @@ def mittel(werte):
     return mean(sauber) if sauber else None
 
 
-def indikatoren_bauen(kurse, gruppen):
+def indikatoren_bauen(kurse, gruppen, zusatz=None):
     """Baut die Spreads und Verhaeltnisse, die einzelne Kurse nicht zeigen."""
 
     def gruppe_schnitt(name, feld):
@@ -383,6 +419,21 @@ def indikatoren_bauen(kurse, gruppen):
             "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
         })
 
+    # --- China-KI auf Wochenfrist, damit sie mit den Neoclouds vergleichbar wird
+    china_w = gruppe_schnitt("China KI-Modelle und Software", "woche_prozent")
+    if china_w is not None and ndx_w is not None:
+        rs_w = china_w - ndx_w
+        ind.append({
+            "name": "China-KI, Woche",
+            "wert": rs_w,
+            "einheit": "%-Pkt vs Nasdaq (1 Woche)",
+            "erklaerung": "Dieselbe Gruppe auf kurzer Frist. Ein Monatswert kann "
+                          "eine starke und eine schwache Woche verdecken - erst "
+                          "der Vergleich beider Fristen zeigt, ob sich etwas "
+                          "gerade dreht.",
+            "these": "gut" if rs_w > 2 else ("schlecht" if rs_w < -2 else "neutral"),
+        })
+
     # --- China-Gegenprobe ueber die Fertigung
     chipfert = gruppe_schnitt("China Chipfertigung", "monat_prozent")
     if chipfert is not None and ndx is not None:
@@ -400,39 +451,26 @@ def indikatoren_bauen(kurse, gruppen):
             "these": "neutral",
         })
 
-    # --- Kreditrisiko sauber isoliert
-    hyg = wert("HYG", "monat_prozent")
-    lqd = wert("LQD", "monat_prozent")
-    if hyg is not None and lqd is not None:
-        # Als Aufschlag gerechnet, nicht als Wertentwicklung: Wenn Hochzins
-        # schlechter laeuft als erste Bonitaet, weitet sich der Risikoaufschlag.
-        # Steigende Zahl heisst also teurere Refinanzierung - und das stuetzt
-        # die These. Die umgekehrte Rechnung haette dem Namen widersprochen.
-        aufschlag = lqd - hyg
+    # --- Kreditrisiko am eigentlichen Mass, nicht am Aktienersatz
+    aufschlag = zusatz.get("hochzins_aufschlag") if zusatz else None
+    if aufschlag:
+        jetzt_bp = aufschlag["jetzt"] * 100
+        monat_bp = aufschlag["monat"] * 100
+        woche_bp = aufschlag["woche"] * 100
         ind.append({
-            "name": "Kreditrisiko-Aufschlag",
-            "wert": aufschlag,
-            "einheit": "%-Pkt Ausweitung (1 Monat)",
-            "erklaerung": "Wie weit Hochzinsanleihen hinter erster Bonitaet "
-                          "zurueckbleiben. Das trennt echtes Ausfallrisiko von "
-                          "blossen Zinsbewegungen, die beide gleich treffen. "
-                          "<b>Steigt der Aufschlag, wird die Refinanzierung der "
-                          "schuldenfinanzierten Rechenzentrumsbauer teuer</b> - "
-                          "und eine Blase platzt ueber die Finanzierung, nicht "
-                          "ueber die Stimmung.",
-            "these": ("gut" if aufschlag > 1
-                      else "schlecht" if aufschlag < -1 else "neutral"),
-            "richtung": "hoch_ist_gut",
-        })
-    elif hyg is not None:
-        ind.append({
-            "name": "Hochzins-Kredite (HYG)",
-            "wert": hyg,
-            "richtung": "tief_ist_gut",
-            "einheit": "% (1 Monat)",
-            "erklaerung": "Die Neoclouds finanzieren GPUs mit Fremdkapital. Faellt "
-                          "HYG, wird ihre Refinanzierung teurer.",
-            "these": "gut" if hyg < -1 else "neutral",
+            "name": "Hochzins-Risikoaufschlag",
+            "wert": jetzt_bp,
+            "einheit": "Basispunkte (%+.0f Bp Woche, %+.0f Bp Monat)" % (woche_bp, monat_bp),
+            "erklaerung": "Was schlechte Schuldner ueber sichere zahlen muessen "
+                          "(ICE BofA, optionsbereinigt). <b>Steigt er, wird "
+                          "Fremdkapital teuer</b> &ndash; und die "
+                          "schuldenfinanzierten Rechenzentrumsbauer sind darauf "
+                          "angewiesen. Eine Blase platzt ueber die Finanzierung. "
+                          "Langfristiger Schnitt liegt bei rund 500 Basispunkten.",
+            "these": ("gut" if monat_bp > 25
+                      else "schlecht" if monat_bp < -25 else "neutral"),
+            "nachkomma": 0,
+            "veraenderung_monat": monat_bp,
         })
 
     # --- Speicherpreise als Kostenindikator
@@ -465,7 +503,7 @@ def barometer_rechnen(indikatoren, nachrichten):
         "Konzentrations-Spread": 1.0,
         "China-KI-Relativstaerke": 1.0,
         "Strom-Relativstaerke": 0.8,
-        "Kreditrisiko-Aufschlag": 1.0,
+        "Hochzins-Risikoaufschlag": 1.0,
         "Hochzins-Kredite (HYG)": 0.7,
     }
 
@@ -473,7 +511,11 @@ def barometer_rechnen(indikatoren, nachrichten):
         gewicht = gewichte.get(ind["name"])
         if gewicht is None:
             continue
-        roh = ind["wert"]
+        # Beim Risikoaufschlag zaehlt die Bewegung, nicht der absolute Stand:
+        # 273 Basispunkte sind fuer sich genommen keine Richtungsaussage.
+        roh = ind.get("veraenderung_monat", ind["wert"])
+        if ind["name"] == "Hochzins-Risikoaufschlag":
+            roh = -roh / 5.0          # 50 Bp Ausweitung entsprechen 10 Punkten
         if ind["name"] == "China-KI-Relativstaerke":
             roh = -roh          # dort ist Staerke gut fuer die These
         # -10 bis +10 Prozentpunkte auf -1..+1 abbilden, Vorzeichen drehen
@@ -955,7 +997,8 @@ LAGE HEUTE (%s)
 
 Barometer: %d/100 (%s) - hoch bedeutet, das Umfeld arbeitet fuer die Short-These.
 
-Positionen:
+Positionen (Puffer = bis zur Knock-Out-Barriere, bis Stop = bis zur
+Verkaufsmarke, die deutlich frueher greift):
 %s
 
 Abgeleitete Indikatoren:
@@ -1035,7 +1078,7 @@ Ausloeser sind ausschliesslich:
 3. THESE SCHLAGARTIG BESTAETIGT: Ein Effizienzdurchbruch bei Modellen im
    Rang eines DeepSeek-Moments, eine angekuendigte Capex-Kuerzung, ein
    grossflaechiger Baustopp, oder erstmals sichtbarer Finanzierungsstress
-   (Kreditrisiko-Aufschlag deutlich negativ). Auch Gutes kann eilig sein,
+   (Hochzins-Risikoaufschlag weitet sich um mehr als 50 Basispunkte im Monat). Auch Gutes kann eilig sein,
    wenn es eine Gewinnmitnahme nahelegt.
 4. TERMIN MIT FOLGEN: Nvidia-Zahlen sind erschienen und weichen erkennbar
    von der Erwartung ab.
@@ -1077,10 +1120,12 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         date.today().strftime("%d.%m.%Y"),
         barometer[0], barometer[1],
         zeilen(positionen, 5, lambda p: "  %s (%s): Basiswert %.2f, Tag %+.2f%%, "
-               "Barriere-Puffer %s" % (
+               "Puffer %s, bis Stop %s" % (
                    p["name"], p.get("wkn", ""), p["kurs"], p["tag_prozent"],
                    ("%.1f%%" % p["barriere_abstand"]) if p.get("barriere_abstand")
-                   is not None else "?")),
+                   is not None else "?",
+                   ("%.1f%%" % p["abstand_verlustschwelle"])
+                   if p.get("abstand_verlustschwelle") is not None else "?")),
         zeilen(indikatoren, 12, lambda i: "  %s: %.2f %s" % (
             i["name"], i["wert"], i["einheit"])),
         zeilen(relevant, 25, lambda n: "  [%s] %s (%s)" % (
@@ -1755,24 +1800,28 @@ def kernbox(indikatoren, gruppen_ansicht, mit_steuerung=True):
     nach_name = {i["name"]: i for i in indikatoren}
     t = ['<aside class="kernbox">']
 
-    haupt = nach_name.get("Kreditrisiko-Aufschlag")
+    haupt = nach_name.get("Hochzins-Risikoaufschlag")
     if haupt:
         klasse = ("gut" if haupt["these"] == "gut"
                   else "schlecht" if haupt["these"] == "schlecht" else "neutral")
         # Skala von -3 bis +3 Prozentpunkten: links rot (Risikofreude, gegen
         # die These), Mitte grau, rechts gruen (Stress, fuer die These).
-        anteil = max(0.0, min(1.0, (haupt["wert"] + 3.0) / 6.0))
+        # Skala von 200 bis 800 Basispunkten: links eng (Geld billig, gegen
+        # die These), rechts weit (Stress, fuer die These).
+        anteil = max(0.0, min(1.0, (haupt["wert"] - 200.0) / 600.0))
+        veraenderung = haupt.get("veraenderung_monat", 0.0)
         t.append('<div class="kern-haupt">'
-                 '<div class="kern-titel">Kreditrisiko-Aufschlag</div>'
-                 '<div class="kern-wert %s">%+.2f</div>'
+                 '<div class="kern-titel">Hochzins-Risikoaufschlag</div>'
+                 '<div class="kern-wert %s">%.0f <span class="einheit">Bp</span></div>'
+                 '<div class="klein" style="margin:-2px 0 4px">%+.0f Bp im Monat</div>'
                  '<div class="kernskala"><i style="left:calc(%.1f%% - 1px)"></i></div>'
-                 '<div class="kernskala-marken"><span>-3 Risikofreude</span>'
-                 '<span>0</span><span>+3 Stress</span></div>'
-                 '<div class="kern-hinweis">Hochzins gegen erste Bonitaet, '
-                 '1 Monat. <b>Steigt er, wird Refinanzierung teuer</b> &ndash; '
-                 'das stuetzt die These. Eine Blase platzt ueber die '
-                 'Finanzierung.</div></div>'
-                 % (klasse, haupt["wert"], anteil * 100))
+                 '<div class="kernskala-marken"><span>200 billig</span>'
+                 '<span>500 Schnitt</span><span>800 Stress</span></div>'
+                 '<div class="kern-hinweis">Was schlechte Schuldner ueber sichere '
+                 'zahlen. <b>Steigt er, wird Fremdkapital teuer</b> &ndash; das '
+                 'stuetzt die These. Eine Blase platzt ueber die Finanzierung.'
+                 '</div></div>'
+                 % (klasse, haupt["wert"], veraenderung, anteil * 100))
 
     weitere = [nach_name[n] for n in KERNINDIKATOREN[1:] if n in nach_name]
     if weitere:
@@ -2157,6 +2206,7 @@ ul.liste li:last-child{border-bottom:none}
 .kern-haupt{padding-bottom:13px;border-bottom:1px solid var(--rand)}
 .kern-wert{font-size:31px;font-weight:650;line-height:1.05;letter-spacing:-.02em;
  font-variant-numeric:tabular-nums;margin-bottom:5px}
+.kern-wert .einheit{font-size:15px;font-weight:600;opacity:.7}
 .kern-hinweis{font-size:11.5px;color:var(--gedaempft);line-height:1.45}
 .kernskala{height:8px;border-radius:4px;margin:9px 0 4px;position:relative;
  background:linear-gradient(90deg,var(--schlecht) 0%,var(--flaeche2) 42%,
@@ -2475,8 +2525,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     t.append("<h2>Positionen</h2><div class='tabelle'><table><tr><th>Position</th><th>WKN</th>"
              "<th>Verlauf 3 Monate</th><th class='z'>Kurs</th><th class='z'>Tag</th>"
              "<th class='z'>Schein Tag</th><th class='z'>seit Einstieg</th>"
-             "<th class='z'>Puffer</th><th class='z'>Drag bisher</th>"
-             "<th class='z'>Drag/Woche</th></tr>")
+             "<th class='z'>bis Stop</th>"
+             "<th class='z'>Puffer</th><th class='z'>Drag/Woche</th></tr>")
     for p in positionen:
         puffer = p.get("barriere_abstand")
         pk = "neutral"
@@ -2485,7 +2535,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append("<tr><td>%s</td><td class='klein'>%s</td><td>%s</td>"
                  "<td class='z'>%.2f</td><td class='z %s'>%s</td>"
                  "<td class='z %s'>%s</td><td class='z %s'>%s</td>"
-                 "<td class='z %s'>%s</td><td class='z neutral'>%s</td>"
+                 "<td class='z %s'>%s</td><td class='z %s'>%s</td>"
                  "<td class='z neutral'>%s</td></tr>" % (
                      p["name"], p.get("wkn", ""), sparkline(p.get("verlauf")),
                      p["kurs"],
@@ -2494,8 +2544,11 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      zahl(p["schein_tag_prozent"], 2, "%"),
                      klasse_fuer(p.get("schein_seit_einstieg"), True),
                      zahl(p.get("schein_seit_einstieg"), 1, "%"),
+                     ("schlecht" if (p.get("abstand_verlustschwelle") or -99) > -12
+                      else "warn" if (p.get("abstand_verlustschwelle") or -99) > -22
+                      else "neutral"),
+                     zahl(p.get("abstand_verlustschwelle"), 1, "%"),
                      pk, ("%.1f%%" % puffer) if puffer is not None else "&ndash;",
-                     zahl(p.get("drag_prozent"), 1, "%"),
                      zahl(p.get("drag_woche_prozent"), 1, "%")))
     t.append("</table></div>")
     t.append('<div class="klein" style="margin-top:8px">Schein-Werte sind '
@@ -2737,7 +2790,22 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         positionen.append(ausgewertet)
 
     gute_kurse = {k: v for k, v in kurse.items() if not v.get("fehler")}
-    indikatoren = indikatoren_bauen(gute_kurse, gruppen)
+
+    # Risikoaufschlag von der Notenbank, statt ihn aus Aktienkursen zu schaetzen
+    zusatz = {}
+    reihe = fred_reihe(kennung)
+    if len(reihe) > 25:
+        jetzt = reihe[-1][1]
+        zusatz["hochzins_aufschlag"] = {
+            "jetzt": jetzt,
+            "woche": jetzt - reihe[-6][1],
+            "monat": jetzt - reihe[-22][1],
+            "stand": reihe[-1][0],
+        }
+    else:
+        fehler.append("Risikoaufschlag (FRED) nicht abrufbar")
+
+    indikatoren = indikatoren_bauen(gute_kurse, gruppen, zusatz)
 
     gruppen_ansicht = []
     for name, info in gruppen.items():
