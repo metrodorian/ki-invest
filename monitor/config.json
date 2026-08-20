@@ -13,7 +13,7 @@
       "kapital_eur": 1003.8,
       "einstiegskurs_schein": 0.451755,
       "stueck": 2222,
-      "stop_schein": 0.253
+      "stop_schein": 0.294
     },
     {
       "name": "Vertiv Short",
@@ -36,7 +36,7 @@
     "tagesbewegung_prozent": 5.0,
     "barriere_warnung_prozent": 25.0,
     "barriere_alarm_prozent": 15.0,
-    "verlust_warnung_prozent": 40,
+    "verlust_warnung_prozent": 30,
     "gewinn_ziel_prozent": 50
   },
   "gruppen": {
