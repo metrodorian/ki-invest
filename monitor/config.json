@@ -412,39 +412,6 @@
         "bemerkung": ""
       },
       {
-        "rang": 7,
-        "anbieter": "OpenAI",
-        "modell": "GPT-5.4 Pro",
-        "faehigkeit": 97,
-        "eingabe": null,
-        "ausgabe": null,
-        "land": "US",
-        "stand": "2026-08-20",
-        "bemerkung": "Preis nicht ermittelt"
-      },
-      {
-        "rang": 8,
-        "anbieter": "OpenAI",
-        "modell": "GPT-5.2 Pro",
-        "faehigkeit": 97,
-        "eingabe": null,
-        "ausgabe": null,
-        "land": "US",
-        "stand": "2026-08-20",
-        "bemerkung": "Preis nicht ermittelt"
-      },
-      {
-        "rang": 9,
-        "anbieter": "Anthropic",
-        "modell": "Claude Opus 4.7 (Fast)",
-        "faehigkeit": 97,
-        "eingabe": null,
-        "ausgabe": null,
-        "land": "US",
-        "stand": "2026-08-20",
-        "bemerkung": "Preis nicht ermittelt"
-      },
-      {
         "rang": 10,
         "anbieter": "Moonshot",
         "modell": "Kimi K3",
@@ -487,17 +454,6 @@
         "land": "US",
         "stand": "2026-08-20",
         "bemerkung": ""
-      },
-      {
-        "rang": 46,
-        "anbieter": "Moonshot",
-        "modell": "Kimi K2.6",
-        "faehigkeit": 92,
-        "eingabe": null,
-        "ausgabe": null,
-        "land": "CN",
-        "stand": "2026-08-20",
-        "bemerkung": "Preis nicht ermittelt"
       },
       {
         "rang": 58,

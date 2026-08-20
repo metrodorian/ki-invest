@@ -1850,7 +1850,7 @@ STEUERUNG = """
     <div class="mf-titel">Alarme</div>
     <div class="mf-reihe">
       <button type="button" data-aktion2="ruhe" id="mf-ruhe">Stumm bis morgen</button>
-      <button type="button" data-aktion2="probealarm">Probealarm</button>
+      <button type="button" data-aktion2="probealarm" id="mf-probe">Probealarm</button>
     </div>
     <div class="mf-hinweis" id="mf-ruhestand">Die Ueberwachung laeuft
      waehrend der Stummschaltung weiter, nur Lampe und Telegram schweigen.</div>
@@ -1940,6 +1940,21 @@ STEUERUNG = """
 
   var vermerkfeld = document.getElementById("mf-vermerk");
 
+  var probeknopf = document.getElementById("mf-probe");
+
+  function probeLaden() {
+    // Blinkt es gerade, wird aus dem Ausloeser der Ausschalter. Sonst stuenden
+    // zwei Knoepfe fuer dieselbe Sache nebeneinander.
+    fetch("/blink/status", { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) {
+        probeknopf.textContent = z.blinkt ? "Probealarm aus" : "Probealarm";
+        probeknopf.dataset.aktion2 = z.blinkt ? "probealarm-aus" : "probealarm";
+        probeknopf.classList.toggle("zu", !!z.blinkt);
+      })
+      .catch(function () {});
+  }
+
   function ruheLaden() {
     holen("/aktion/zustand").then(function (z) {
       if (z.notiz !== undefined) { vermerkfeld.value = z.notiz || ""; }
@@ -1957,6 +1972,7 @@ STEUERUNG = """
   document.getElementById("mehroeffnen").onclick = function () {
     positionenLaden();
     ruheLaden();
+    probeLaden();
     if (fenster.showModal) { fenster.showModal(); } else { fenster.setAttribute("open", ""); }
   };
   document.getElementById("mehrzu").onclick = function () {
@@ -1971,7 +1987,12 @@ STEUERUNG = """
     if (!a) { return; }
     a.disabled = true;
     holen("/aktion/" + a.dataset.aktion2)
-      .then(function (z) { sagen(z.text, z.ok); ruheLaden(); })
+      .then(function (z) {
+        sagen(z.text, z.ok);
+        ruheLaden();
+        probeLaden();
+        setTimeout(probeLaden, 2500);
+      })
       .finally(function () { a.disabled = false; });
   });
 

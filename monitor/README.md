@@ -289,6 +289,33 @@ Alle mit Rechten 600. `config.pi.json` im Repo ist eine bereinigte Vorlage.
 
 Mail geht über den lokalen Postfix, deshalb sind dort keine Zugangsdaten nötig.
 
+## Betrieb
+
+`betrieb.sh` liegt lokal, auf dem Pi und im Repo. Dasselbe Programm, der
+Unterschied steckt nur im Ziel-Schalter:
+
+```
+./betrieb.sh status            wirkt dort, wo es aufgerufen wird
+./betrieb.sh status --pi       schickt sich selbst per ssh auf den Pi
+```
+
+| Befehl | Wirkung |
+|---|---|
+| `status` | Prozesse, Cron-Plan, letzte Laeufe |
+| `pruefen` | Konfiguration auf Vollstaendigkeit pruefen |
+| `web-neu`, `bot-neu`, `alles-neu` | Dienste sauber neu starten |
+| `logs [n]` | letzte Zeilen aus cron.log, monitor.log, bot.log |
+| `lauf [--mit-claude]` | Monitorlauf anstossen |
+| `bericht` | Tagesbericht bauen und verschicken |
+| `probealarm`, `probealarm-aus` | Meldekette testen und wieder abstellen |
+
+`pruefen` meldet auf dem Mac erwartungsgemaess fehlende Bloecke `mail`,
+`telegram` und `hue` - die gehoeren nur auf den Pi. Auf dem Pi muss es
+`Konfiguration vollstaendig` sagen; tut es das nicht, schweigt die Meldekette.
+
+Ziel und Zugang lassen sich ueber `KI_PI_ZIEL`, `KI_PI_SCHLUESSEL`,
+`KI_PI_ORDNER` und `KI_PORT` ueberschreiben.
+
 ## Pflege
 
 In `config.json` aktuell halten:

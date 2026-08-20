@@ -194,6 +194,15 @@ class Handler(SimpleHTTPRequestHandler):
             im_hintergrund(sys.executable, "probealarm.py")
             return self.antwort({"ok": True, "text": "Probealarm wird ausgeloest."})
 
+        # Gegenstueck zum Probealarm: derselbe Knopf stellt ihn wieder ab.
+        if was == "probealarm-aus":
+            lief = os.path.exists(LAEUFT)
+            if lief:
+                open(STOPP, "w").close()
+            return self.antwort({"ok": True,
+                                 "text": "Probealarm abgestellt." if lief
+                                         else "Es blinkt gerade nichts."})
+
         if was == "ruhe":
             bis = konfig.get("hue", {}).get("nacht_bis", 7)
             ziel = datetime.now().replace(hour=bis, minute=0, second=0, microsecond=0)
