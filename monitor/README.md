@@ -197,10 +197,14 @@ Steuerung in der rechten Spalte:
 
 | Knopf | Wirkung |
 |---|---|
-| Jetzt neu rechnen | voller Lauf samt Einordnung, im Hintergrund |
-| Alarme stumm bis morgen | Stummschaltung bis 7 Uhr, Knopf wird zum Aufheben |
-| Probealarm | löst die ganze Meldekette einmal aus |
-| Vermerk | Text erscheint oben im Bericht, leeres Feld löscht ihn |
+| Bericht erneuern | voller Lauf samt Einordnung, im Hintergrund |
+| Weitere Aktionen | öffnet ein Fenster mit dem Rest |
+
+Im Fenster: Alarme stummschalten oder Probealarm auslösen, Reset-Barrieren
+nachtragen, Positionen als geschlossen markieren, einen Vermerk für den Bericht
+setzen, und den Bericht per Telegram schicken.
+
+In der Mailfassung fehlen alle Knöpfe — dort wären sie wirkungslos.
 
 Dieselben Funktionen gibt es über Telegram, siehe **hilfe** im Chat.
 

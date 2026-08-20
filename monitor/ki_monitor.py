@@ -1407,14 +1407,7 @@ KERNINDIKATOREN = ["Kreditrisiko-Aufschlag", "VIX-Terminstruktur",
 STEUERUNG = """
 <div class="steuerung" id="steuerung" hidden>
   <div class="kern-titel" style="margin-top:16px">Steuerung</div>
-  <button type="button" data-aktion="neu">Jetzt neu rechnen</button>
-  <button type="button" data-aktion="ruhe" id="ruheknopf">Alarme stumm bis morgen</button>
-  <button type="button" data-aktion="probealarm" class="leise">Probealarm</button>
-  <div class="vermerkfeld">
-    <input type="text" id="vermerk" placeholder="Vermerk fuer den Bericht"
-           maxlength="200" autocomplete="off">
-    <button type="button" data-aktion="notiz" class="leise">Merken</button>
-  </div>
+  <button type="button" data-aktion="neu">Bericht erneuern</button>
   <button type="button" id="mehroeffnen" class="leise">Weitere Aktionen &hellip;</button>
   <div class="rueckmeldung" id="rueckmeldung" hidden></div>
 </div>
@@ -1426,13 +1419,13 @@ STEUERUNG = """
   </div>
 
   <div class="mf-block">
-    <div class="mf-titel">Auskunft</div>
+    <div class="mf-titel">Alarme</div>
     <div class="mf-reihe">
-      <button type="button" data-info="status">Status</button>
-      <button type="button" data-info="kurse">Kurse</button>
-      <button type="button" data-info="termine">Termine</button>
+      <button type="button" data-aktion2="ruhe" id="mf-ruhe">Stumm bis morgen</button>
+      <button type="button" data-aktion2="probealarm">Probealarm</button>
     </div>
-    <div class="mf-ausgabe" id="mf-ausgabe" hidden></div>
+    <div class="mf-hinweis" id="mf-ruhestand">Die Ueberwachung laeuft
+     waehrend der Stummschaltung weiter, nur Lampe und Telegram schweigen.</div>
   </div>
 
   <div class="mf-block">
@@ -1452,10 +1445,19 @@ STEUERUNG = """
   </div>
 
   <div class="mf-block">
+    <div class="mf-titel">Vermerk fuer den Bericht</div>
+    <div class="mf-reihe">
+      <input type="text" id="mf-vermerk" placeholder="erscheint oben im Bericht"
+             maxlength="200" autocomplete="off">
+      <button type="button" id="mf-vermerk-los">Merken</button>
+    </div>
+    <div class="mf-hinweis">Leeres Feld und Merken loescht den Vermerk.</div>
+  </div>
+
+  <div class="mf-block">
     <div class="mf-titel">Senden</div>
     <div class="mf-reihe">
       <button type="button" data-aktion2="telegram-bericht">Bericht per Telegram</button>
-      <button type="button" data-aktion2="probealarm">Probealarm</button>
     </div>
   </div>
 
@@ -1465,8 +1467,9 @@ STEUERUNG = """
 <script>
 (function () {
   var fenster = document.getElementById("mehrfenster");
-  var ausgabe = document.getElementById("mf-ausgabe");
   var meldung = document.getElementById("mf-meldung");
+  var ruheknopf = document.getElementById("mf-ruhe");
+  var ruhestand = document.getElementById("mf-ruhestand");
   var stand = document.getElementById("mf-barrierestand");
   var liste = document.getElementById("mf-positionen");
   var feld = document.getElementById("mf-barriere");
@@ -1507,9 +1510,25 @@ STEUERUNG = """
     });
   }
 
+  var vermerkfeld = document.getElementById("mf-vermerk");
+
+  function ruheLaden() {
+    holen("/aktion/zustand").then(function (z) {
+      if (z.notiz !== undefined) { vermerkfeld.value = z.notiz || ""; }
+      ruheknopf.textContent = z.ruhe_bis ? "Stumm bis " + z.ruhe_bis + " \u2013 aufheben"
+                                         : "Stumm bis morgen";
+      ruheknopf.dataset.aktion2 = z.ruhe_bis ? "ruhe-aus" : "ruhe";
+      ruheknopf.classList.toggle("zu", !!z.ruhe_bis);
+      ruhestand.textContent = z.ruhe_bis
+        ? "Alarme schweigen bis " + z.ruhe_bis + " Uhr. Die Ueberwachung laeuft weiter."
+        : "Die Ueberwachung laeuft waehrend der Stummschaltung weiter, "
+          + "nur Lampe und Telegram schweigen.";
+    });
+  }
+
   document.getElementById("mehroeffnen").onclick = function () {
     positionenLaden();
-    ausgabe.hidden = true;
+    ruheLaden();
     if (fenster.showModal) { fenster.showModal(); } else { fenster.setAttribute("open", ""); }
   };
   document.getElementById("mehrzu").onclick = function () {
@@ -1520,22 +1539,20 @@ STEUERUNG = """
   });
 
   fenster.addEventListener("click", function (e) {
-    var k = e.target.closest("button[data-info]");
-    if (k) {
-      ausgabe.hidden = false;
-      ausgabe.innerHTML = "wird geholt \u2026";
-      holen("/aktion/info?was=" + k.dataset.info).then(function (z) {
-        ausgabe.innerHTML = z.ok ? z.html : (z.text || "Nicht abrufbar.");
-      });
-      return;
-    }
     var a = e.target.closest("button[data-aktion2]");
-    if (a) {
-      a.disabled = true;
-      holen("/aktion/" + a.dataset.aktion2)
-        .then(function (z) { sagen(z.text, z.ok); })
-        .finally(function () { a.disabled = false; });
-    }
+    if (!a) { return; }
+    a.disabled = true;
+    holen("/aktion/" + a.dataset.aktion2)
+      .then(function (z) { sagen(z.text, z.ok); ruheLaden(); })
+      .finally(function () { a.disabled = false; });
+  });
+
+  document.getElementById("mf-vermerk-los").onclick = function () {
+    holen("/aktion/notiz?text=" + encodeURIComponent(vermerkfeld.value.trim()))
+      .then(function (z) { sagen(z.text, z.ok); });
+  };
+  vermerkfeld.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { document.getElementById("mf-vermerk-los").click(); }
   });
 
   document.getElementById("mf-barriere-los").onclick = function () {
@@ -1552,9 +1569,7 @@ STEUERUNG = """
 (function () {
   var block = document.getElementById("steuerung");
   var meldung = document.getElementById("rueckmeldung");
-  var ruheknopf = document.getElementById("ruheknopf");
-  var feld = document.getElementById("vermerk");
-  var ruhtBis = null;
+
 
   function sagen(text, gut) {
     meldung.textContent = text;
@@ -1568,13 +1583,6 @@ STEUERUNG = """
       .then(function (a) { return a.json(); })
       .then(function (z) {
         block.hidden = false;
-        ruhtBis = z.ruhe_bis;
-        ruheknopf.textContent = z.ruhe_bis
-          ? "Stumm bis " + z.ruhe_bis + " \u2013 aufheben"
-          : "Alarme stumm bis morgen";
-        ruheknopf.dataset.aktion = z.ruhe_bis ? "ruhe-aus" : "ruhe";
-        ruheknopf.classList.toggle("aktiv", !!z.ruhe_bis);
-        if (z.notiz && !feld.value) { feld.value = z.notiz; }
       })
       .catch(function () { block.hidden = true; });
   }
@@ -1582,23 +1590,13 @@ STEUERUNG = """
   block.addEventListener("click", function (e) {
     var knopf = e.target.closest("button[data-aktion]");
     if (!knopf) { return; }
-    var was = knopf.dataset.aktion;
-    var ziel = "/aktion/" + was;
-    if (was === "notiz") {
-      ziel += "?text=" + encodeURIComponent(feld.value.trim());
-    }
     knopf.disabled = true;
+    var ziel = "/aktion/" + knopf.dataset.aktion;
     fetch(ziel, { cache: "no-store" })
       .then(function (a) { return a.json(); })
       .then(function (z) { sagen(z.text || "Erledigt.", z.ok !== false); zustand(); })
       .catch(function () { sagen("Hat nicht geklappt.", false); })
       .finally(function () { knopf.disabled = false; });
-  });
-
-  feld.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-      block.querySelector('button[data-aktion="notiz"]').click();
-    }
   });
 
   zustand();
@@ -1608,7 +1606,7 @@ STEUERUNG = """
 """
 
 
-def kernbox(indikatoren, gruppen_ansicht):
+def kernbox(indikatoren, gruppen_ansicht, mit_steuerung=True):
     """
     Schmale Spalte mit den Kennzahlen, die den Zustand des Systems beschreiben -
     nicht die Richtung einzelner Werte. Der Kreditrisiko-Aufschlag steht oben:
@@ -1677,7 +1675,8 @@ def kernbox(indikatoren, gruppen_ansicht):
                  'einnimmt, verteilt der Markt die Marge um &ndash; das ist etwas '
                  'anderes als ein platzender Ausbau.</div>')
 
-    t.append(STEUERUNG)
+    if mit_steuerung:
+        t.append(STEUERUNG)      # in der Mail waeren die Knoepfe wirkungslos
     t.append("</aside>")
     return "".join(t)
 
@@ -2157,7 +2156,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     # E-Mail-Programme koennen das Rasterlayout nicht, dort wuerde die rechte
     # Spalte sonst ans Ende der Nachricht rutschen.
     if fuer_mail:
-        t.append(kernbox(indikatoren, gruppen_ansicht))
+        t.append(kernbox(indikatoren, gruppen_ansicht, mit_steuerung=False))
 
     # ---- Zusammenfassung in Worten
     claude_saetze = []
