@@ -33,7 +33,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from math import log, sqrt, exp
 from statistics import pstdev, mean
 
@@ -688,6 +688,7 @@ def rss_lesen(url, kennung, quelle, maximal=15):
         })
         if len(eintraege) >= maximal:
             break
+
     return eintraege
 
 
@@ -727,6 +728,47 @@ SEC_PUNKTE = {
     "8.01": ("Sonstiges Ereignis", False),
     "9.01": ("Finanzberichte und Anlagen", False),
 }
+
+
+def sec_inhalt_lesen(link, punkte, kennung, hoechstlaenge=1400):
+    """
+    Liest den Text zu den wesentlichen Punkten einer 8-K-Meldung.
+
+    Die Punktnummer sagt, WAS passiert ist, aber nicht WORUM es geht. Erst der
+    Wortlaut zeigt, ob eine "neue Finanzverbindlichkeit" eine gewoehnliche
+    Anleihe ist oder eine Buergschaft fuer einen Kunden - also
+    Zirkelfinanzierung, die den eigenen Umsatz stuetzt.
+    """
+    if not link:
+        return ""
+    try:
+        rohdaten = abrufen(link, kennung, versuche=2)
+    except IOError:
+        return ""
+
+    text = rohdaten.decode("utf-8", "ignore")
+    text = re.sub(r"<[^>]+>", " ", text)
+    for alt, neu in [("&#160;", " "), ("&nbsp;", " "), ("&#8220;", '"'),
+                     ("&#8221;", '"'), ("&#8217;", "'"), ("&#8212;", "-"),
+                     ("&amp;", "&"), ("&#8211;", "-")]:
+        text = text.replace(alt, neu)
+    text = re.sub(r"\s+", " ", text)
+
+    stuecke = []
+    for punkt in punkte:
+        beschreibung = SEC_PUNKTE.get(punkt, ("Punkt " + punkt, False))
+        if not beschreibung[1]:
+            continue                      # nur die wesentlichen ausschreiben
+        treffer = re.search(r"Item\s+%s(.{60,%d})" % (re.escape(punkt), hoechstlaenge),
+                            text)
+        if treffer:
+            roh = treffer.group(1).strip(" .\u00a0")
+            # Bis zum naechsten Punkt abschneiden, sonst laeuft es weiter
+            ende = re.search(r"Item\s+\d\.\d\d", roh)
+            if ende and ende.start() > 120:
+                roh = roh[:ende.start()]
+            stuecke.append("%s: %s" % (beschreibung[0], roh.strip()))
+    return " | ".join(stuecke)[:2600]
 
 
 def sec_meldungen(cik, name, kennung, maximal=6):
@@ -772,6 +814,19 @@ def sec_meldungen(cik, name, kennung, maximal=6):
         })
         if len(eintraege) >= maximal:
             break
+
+    # Nur die wesentlichen und nur die juengsten ausschreiben - jede Abfrage
+    # kostet Zeit, und aeltere Meldungen sind ohnehin verarbeitet.
+    grenze = (date.today() - timedelta(days=45)).isoformat()
+    gelesen = 0
+    for eintrag in eintraege:
+        if gelesen >= 3:
+            break
+        if eintrag["wichtig"] and eintrag["datum"] >= grenze:
+            eintrag["auszug"] = sec_inhalt_lesen(eintrag["link"],
+                                                 eintrag["punkte"], kennung)
+            if eintrag["auszug"]:
+                gelesen += 1
     return eintraege
 
 
@@ -1034,9 +1089,10 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
         zeilen(blogs, 10, lambda b: "  [%s] %s" % (b["quelle"], b["titel"][:150])),
-        zeilen(sec, 10, lambda s: "  %s %s%s" % (
+        zeilen(sec, 10, lambda s: "  %s %s%s%s" % (
             s.get("datum", ""), s["titel"][:130],
-            "  <-- wesentlich" if s.get("wichtig") else "")),
+            "  <-- wesentlich" if s.get("wichtig") else "",
+            ("\n      WORTLAUT: " + s["auszug"][:1100]) if s.get("auszug") else "")),
     )
 
     # Nur Websuche und Seitenabruf sind erlaubt und damit vorab genehmigt.
@@ -2183,6 +2239,9 @@ ul.liste li:last-child{border-bottom:none}
 .alt{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
  background:var(--flaeche2);color:var(--gedaempft);border-radius:3px;
  padding:1px 5px;margin-right:6px;font-weight:600}
+.secauszug{margin-top:9px;padding:10px 13px;background:var(--flaeche2);
+ border-radius:8px;font-size:12.5px;line-height:1.55;color:var(--text);
+ max-height:200px;overflow-y:auto}
 .notiz{background:var(--flaeche2);border-left:4px solid var(--akzent);
  border-radius:9px;padding:12px 16px;margin:14px 0 4px;font-size:14px;
  line-height:1.55}
@@ -2585,11 +2644,13 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append('<div class="karte klein">Keine aktuellen 8-K-Meldungen.</div>')
     for s in sec[:14]:
         t.append('<div class="karte %s"><a href="%s">%s</a><div class="klein">'
-                 '%s &middot; Punkte %s</div></div>'
+                 '%s &middot; Punkte %s</div>%s</div>'
                  % ("hinweis" if s.get("wichtig") else "",
                     html_schuetzen(s.get("link", "")), html_schuetzen(s["titel"]),
                     html_schuetzen(s.get("datum", "")),
-                    html_schuetzen(", ".join(s.get("punkte", [])) or "-")))
+                    html_schuetzen(", ".join(s.get("punkte", [])) or "-"),
+                    ('<div class="secauszug">%s</div>'
+                     % html_schuetzen(s["auszug"][:900])) if s.get("auszug") else ""))
 
     # ---- Termine
     t.append("<h2>Termine</h2><ul class='liste'>")
