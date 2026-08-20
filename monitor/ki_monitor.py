@@ -179,6 +179,39 @@ def kurse_holen(ticker, kennung, zeitraum="6mo"):
     }
 
 
+def scheinkurs_holen(isin, kennung):
+    """
+    Holt Geld- und Briefkurs des Zertifikats.
+
+    Quelle ist wallstreet-online, weil dort die Quotierung des Emittenten steht -
+    also genau der Kurs, den ING im Direkthandel stellt. Gegen onvista geprueft:
+    identisch auf den Cent. Die Emittentenseite selbst liefert nur einen
+    WebSocket-Strom, onvista und die Boerse Frankfurt sperren Skripte aus.
+    """
+    url = "https://www.wallstreet-online.de/zertifikat/%s" % isin.lower()
+    try:
+        rohdaten = abrufen(url, kennung, versuche=2)
+    except IOError:
+        return None
+    text = rohdaten.decode("utf-8", "ignore")
+
+    def feld(name):
+        m = re.search(r'<div id="%s"[^>]*>\s*<span[^>]*>\s*([\d.,]+)' % name, text)
+        if not m:
+            return None
+        try:
+            return float(m.group(1).replace(".", "").replace(",", "."))
+        except ValueError:
+            return None
+
+    geld, brief = feld("bid"), feld("ask")
+    if geld is None and brief is None:
+        return None
+    return {"geld": geld, "brief": brief,
+            "spread_prozent": ((brief - geld) / brief * 100.0)
+                              if (geld and brief) else None}
+
+
 def position_auswerten(position, kurs):
     faktor = position.get("faktor", -2)
     ergebnis = dict(position)
@@ -1299,7 +1332,8 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
             'des Basiswerts mal Faktor und dem Wechselkurs EUR/USD gerechnet '
             '(beide Scheine sind nicht waehrungsgesichert).</div></div>'
             % ("".join(t), " ".join(beine),
-               ("Der aktuelle Punkt stammt aus <b>eingetragenen Ist-Kursen</b>."
+               ("Der aktuelle Punkt stammt aus <b>abgerufenen Ist-Kursen</b> "
+                "(Quotierung des Emittenten, wie im ING-Direkthandel)."
                 if any(r.get("gemessen") for r in reihen) else
                 "Kein Ist-Kurs hinterlegt &ndash; der aktuelle Punkt ist ebenfalls "
                 "gerechnet und kann vom Depot abweichen.")))
@@ -1949,8 +1983,23 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         if daten.get("fehler"):
             fehler.append("Position %s ohne Kurs" % pos.get("name", "?"))
             continue
+        # Echten Scheinkurs holen; er hat Vorrang vor jeder Ableitung.
+        # Schlaegt der Abruf fehl, greift der in der Konfiguration hinterlegte Wert.
+        gestellt = scheinkurs_holen(pos["isin"], kennung) if pos.get("isin") else None
+        if gestellt:
+            if gestellt.get("geld"):
+                pos = dict(pos, kurs_aktuell=gestellt["geld"])
+            if gestellt.get("spread_prozent") is not None:
+                pos["spread_prozent"] = gestellt["spread_prozent"]
+            pos["kurs_quelle"] = "abgerufen"
+        else:
+            fehler.append("Scheinkurs %s nicht abrufbar" % pos.get("wkn", "?"))
+            pos = dict(pos, kurs_quelle="Konfiguration")
+
         ausgewertet = position_auswerten(pos, daten)
         ausgewertet["wertverlauf"] = positionswert_verlauf(pos, daten, hole("EURUSD=X"))
+        ausgewertet["kurs_quelle"] = pos.get("kurs_quelle")
+        ausgewertet["scheinkurs"] = pos.get("kurs_aktuell")
         positionen.append(ausgewertet)
 
     gute_kurse = {k: v for k, v in kurse.items() if not v.get("fehler")}

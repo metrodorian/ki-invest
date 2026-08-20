@@ -15,7 +15,7 @@
       "stueck": 2222,
       "stop_schein": 0.294,
       "spread_prozent": 2.6,
-      "kurs_aktuell": 0.43
+      "isin": "DE000MG4U8W5"
     },
     {
       "name": "Vertiv Short",
@@ -31,7 +31,7 @@
       "stueck": 9,
       "stop_schein": 56.2,
       "spread_prozent": 0.94,
-      "kurs_aktuell": 113.47
+      "isin": "DE000MR275A4"
     }
   ],
   "zeitlimit_bis": "2026-09-17",

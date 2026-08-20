@@ -191,12 +191,17 @@ In `config.json` aktuell halten:
 - **`verlust_warnung_prozent`** und **`gewinn_ziel_prozent`** — solange `null`,
   wird dafür nicht gewarnt.
 - **`termine`** — Quartalszahlen und das Zeitlimit.
-- **`kurs_aktuell`** je Position — der tatsächliche Scheinkurs aus dem Depot.
-  Ist er gesetzt, stimmt der Graph exakt mit ING überein statt nur ungefähr.
-  onvista und die Börse Frankfurt sperren Skriptzugriffe, deshalb lässt sich
-  dieser Wert nicht automatisch holen. Alle paar Tage nachtragen genügt.
-- **`spread_prozent`** je Position — Abstand zwischen Geld- und Briefkurs, für
-  die Bewertung der Zwischenwerte.
+- **`isin`** je Position — nötig für den automatischen Kursabruf.
+
+Scheinkurs und Handelsspanne werden bei jedem Lauf selbst geholt und müssen
+nicht mehr gepflegt werden. Quelle ist wallstreet-online, weil dort die
+Quotierung des **Emittenten** steht — also genau der Kurs, den ING im
+Direkthandel stellt. Gegen onvista geprüft: identisch auf den Cent.
+
+Die naheliegenderen Quellen scheiden aus: Morgan Stanley liefert nur einen
+WebSocket-Strom, onvista antwortet Skripten mit einer Weiterleitungsschleife,
+die Börse Frankfurt und finanzen.net mit 403. Schlägt der Abruf fehl, greifen
+`kurs_aktuell` und `spread_prozent` aus der Konfiguration, falls dort gesetzt.
 
 ## Dateien
 
