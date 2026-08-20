@@ -57,10 +57,20 @@ Schalter:
 
 ## Was beobachtet wird
 
-**Wertverlauf ganz oben** — zwei Linien mit dem Eurowert beider Positionen.
-Durchgezogen ab dem Einstieg, gestrichelt davor (rechnerisch, nicht tatsächlich).
-Die waagerechte Linie je Farbe ist der Einsatz, daran ist Gewinn und Verlust
-direkt ablesbar.
+**Wertverlauf ganz oben** — zwei Linien mit dem Eurowert beider Positionen, zum
+**Geldkurs**, also so wie das Depot bewertet. Durchgezogen ab dem Einstieg,
+gestrichelt davor (rechnerisch). Die waagerechte Linie je Farbe ist der bezahlte
+Briefkurs; der Abstand zur Kurve am Einstieg ist die Handelsspanne. Ein Ring um
+den letzten Punkt bedeutet: eingetragener Ist-Kurs, kein gerechneter.
+
+Der Graph richtet sich am Einstieg aus — mindestens acht Tage Vorlauf, darüber
+hinaus höchstens so viele wie Haltetage. Damit bestimmt die Zeit seit dem Kauf
+das Bild, nicht die Vorgeschichte.
+
+In die Rechnung gehen drei Dinge ein: die Tagesbewegung des Basiswerts mal
+Faktor, der Wechselkurs EUR/USD (beide Scheine sind **nicht**
+währungsgesichert — ein steigender Euro senkt den Eurowert auch bei
+stillstehendem Basiswert) und die Handelsspanne.
 
 **Positionen** — Kurs, Tagesbewegung, geschätzte Schein-Bewegung, Abstand zur
 Knock-Out-Barriere, aufgelaufener Drag und der **erwartete Drag pro Woche** bei
@@ -163,6 +173,12 @@ In `config.json` aktuell halten:
 - **`verlust_warnung_prozent`** und **`gewinn_ziel_prozent`** — solange `null`,
   wird dafür nicht gewarnt.
 - **`termine`** — Quartalszahlen und das Zeitlimit.
+- **`kurs_aktuell`** je Position — der tatsächliche Scheinkurs aus dem Depot.
+  Ist er gesetzt, stimmt der Graph exakt mit ING überein statt nur ungefähr.
+  onvista und die Börse Frankfurt sperren Skriptzugriffe, deshalb lässt sich
+  dieser Wert nicht automatisch holen. Alle paar Tage nachtragen genügt.
+- **`spread_prozent`** je Position — Abstand zwischen Geld- und Briefkurs, für
+  die Bewertung der Zwischenwerte.
 
 ## Dateien
 

@@ -1070,15 +1070,24 @@ def sparkline(werte, breite=110, hoehe=26):
             % (breite, hoehe, breite, hoehe, " ".join(punkte), farbe))
 
 
-def positionswert_verlauf(position, kurs):
+def positionswert_verlauf(position, kurs, devisen=None):
     """
-    Rechnet den Eurowert der Position ueber die Zeit.
+    Rechnet den Eurowert der Position ueber die Zeit - so, wie ihn das Depot
+    ausweist, also zum Geldkurs.
 
-    Ein Faktor-Papier bildet die TAEGLICHE Bewegung des Basiswerts mit dem
-    Faktor ab. Der Wert ergibt sich deshalb aus dem fortlaufenden Produkt
-    (1 + Faktor * Tagesrendite), nicht aus der Gesamtveraenderung. Vor dem
-    Einstiegstag ist die Kurve rechnerisch - sie zeigt, was die Position
-    gekostet haette, nicht was sie gekostet hat.
+    Drei Dinge gehen ein:
+
+    1. Ein Faktor-Papier bildet die TAEGLICHE Bewegung des Basiswerts mit dem
+       Faktor ab. Der Wert ergibt sich aus dem fortlaufenden Produkt
+       (1 + Faktor * Tagesrendite), nicht aus der Gesamtveraenderung.
+    2. Beide Scheine sind nicht waehrungsgesichert. Steigt der Euro, faellt
+       ihr Eurowert, auch wenn der Basiswert stillsteht.
+    3. Gekauft wird zum Brief-, bewertet zum Geldkurs. Die Kurve zeigt den
+       Geldkurs, die Einsatzlinie den bezahlten Briefkurs - der Abstand
+       dazwischen ist die Handelsspanne.
+
+    Steht "kurs_aktuell" in der Konfiguration, ersetzt dieser Wert den
+    letzten Punkt. Dann stimmt der Graph exakt mit dem Depot ueberein.
     """
     kurse = kurs.get("verlauf") or []
     daten = kurs.get("verlauf_datum") or []
@@ -1110,10 +1119,27 @@ def positionswert_verlauf(position, kurs):
         teiler = 1.0 + faktor * r
         schein[i] = schein[i + 1] / teiler if abs(teiler) > 1e-9 else schein[i + 1]
 
+    # Wechselkurswirkung: Eurowert skaliert mit dem Kehrwert von EUR/USD
+    fx = {}
+    if devisen and devisen.get("verlauf") and devisen.get("verlauf_datum"):
+        fx = dict(zip(devisen["verlauf_datum"], devisen["verlauf"]))
+    fx_anker = fx.get(daten[anker_index])
+
+    spanne = position.get("spread_prozent", 0.0) / 100.0
+
     punkte = []
     for i, d in enumerate(daten):
         wert = schein[i] * einstand * stueck
+        if fx_anker and fx.get(d):
+            wert *= fx_anker / fx[d]
+        wert *= (1.0 - spanne)          # Geldkurs statt Briefkurs
         punkte.append({"datum": d, "wert": max(0.0, wert), "vor_einstieg": i < anker_index})
+
+    # Falls ein tatsaechlicher Scheinkurs hinterlegt ist, hat er Vorrang
+    ist_kurs = position.get("kurs_aktuell")
+    if ist_kurs:
+        punkte[-1]["wert"] = ist_kurs * stueck
+        punkte[-1]["gemessen"] = True
 
     # Der Vorlauf dient nur der Einordnung. Er wird gekuerzt, damit die Zeit
     # seit dem Einstieg den Graphen bestimmt und nicht die Vorgeschichte.
@@ -1129,6 +1155,7 @@ def positionswert_verlauf(position, kurs):
         "punkte": punkte, "einsatz": einstand * stueck,
         "anker": anker_index,
         "einstieg": einstieg.isoformat(),
+        "gemessen": bool(position.get("kurs_aktuell")),
     }
 
 
@@ -1207,8 +1234,12 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
         # Einstiegspunkt und aktueller Punkt
         t.append('<circle cx="%.1f" cy="%.1f" r="3" fill="var(--grund)" stroke="%s" '
                  'stroke-width="1.6"/>' % (x(anker, len(punkte)), y(punkte[anker]["wert"]), farbe))
-        t.append('<circle cx="%.1f" cy="%.1f" r="3.4" fill="%s"/>'
-                 % (x(len(punkte) - 1, len(punkte)), y(punkte[-1]["wert"]), farbe))
+        # Gemessener Ist-Kurs bekommt einen Ring, gerechneter nicht
+        xj, yj = x(len(punkte) - 1, len(punkte)), y(punkte[-1]["wert"])
+        t.append('<circle cx="%.1f" cy="%.1f" r="3.4" fill="%s"/>' % (xj, yj, farbe))
+        if r.get("gemessen"):
+            t.append('<circle cx="%.1f" cy="%.1f" r="6" fill="none" stroke="%s" '
+                     'stroke-width="1.2" opacity=".55"/>' % (xj, yj, farbe))
 
     def tag(wert):
         """Datum beschriften - als Objekt oder als Text aus der Sicherung."""
@@ -1245,11 +1276,18 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
                     gv / gesamt_ein * 100))
 
     return ('<div class="wertkarte">%s<div class="legende">%s</div>'
-            '<div class="klein">Gestrichelt vor dem Einstieg: rechnerischer Verlauf, '
-            'nicht dein tatsaechlicher. Die waagerechte Linie je Farbe ist der '
-            'Einsatz. Berechnet aus der Tagesbewegung des Basiswerts mal Faktor, '
-            'ohne Produktkosten &ndash; der verbindliche Kurs steht im Depot.</div></div>'
-            % ("".join(t), " ".join(beine)))
+            '<div class="klein">Gezeigt wird der <b>Geldkurs</b> &ndash; der Wert, '
+            'den auch dein Depot ausweist. Die waagerechte Linie je Farbe ist der '
+            'bezahlte Briefkurs; der Abstand zur Kurve am Einstieg ist die '
+            'Handelsspanne. Gestrichelt vor dem Einstieg: rechnerischer Verlauf, '
+            'nicht dein tatsaechlicher. %s Zwischenwerte sind aus der Tagesbewegung '
+            'des Basiswerts mal Faktor und dem Wechselkurs EUR/USD gerechnet '
+            '(beide Scheine sind nicht waehrungsgesichert).</div></div>'
+            % ("".join(t), " ".join(beine),
+               ("Der aktuelle Punkt stammt aus <b>eingetragenen Ist-Kursen</b>."
+                if any(r.get("gemessen") for r in reihen) else
+                "Kein Ist-Kurs hinterlegt &ndash; der aktuelle Punkt ist ebenfalls "
+                "gerechnet und kann vom Depot abweichen.")))
 
 
 def barometer_verlauf_balken(verlauf):
@@ -1797,7 +1835,7 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
             fehler.append("Position %s ohne Kurs" % pos.get("name", "?"))
             continue
         ausgewertet = position_auswerten(pos, daten)
-        ausgewertet["wertverlauf"] = positionswert_verlauf(pos, daten)
+        ausgewertet["wertverlauf"] = positionswert_verlauf(pos, daten, hole("EURUSD=X"))
         positionen.append(ausgewertet)
 
     gute_kurse = {k: v for k, v in kurse.items() if not v.get("fehler")}

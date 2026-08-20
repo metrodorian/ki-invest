@@ -13,7 +13,9 @@
       "kapital_eur": 1003.8,
       "einstiegskurs_schein": 0.451755,
       "stueck": 2222,
-      "stop_schein": 0.294
+      "stop_schein": 0.294,
+      "spread_prozent": 2.6,
+      "kurs_aktuell": 0.43
     },
     {
       "name": "Vertiv Short",
@@ -27,7 +29,9 @@
       "kapital_eur": 1030.95,
       "einstiegskurs_schein": 114.55,
       "stueck": 9,
-      "stop_schein": 56.2
+      "stop_schein": 56.2,
+      "spread_prozent": 0.94,
+      "kurs_aktuell": 113.47
     }
   ],
   "zeitlimit_bis": "2026-09-17",
