@@ -77,7 +77,11 @@ Knock-Out-Barriere, aufgelaufener Drag und der **erwartete Drag pro Woche** bei
 Seitwärtslauf — die vorausschauende Zahl, mit der sich planen lässt.
 
 **Acht Marktgruppen** — Chips, Neoclouds, Hyperscaler, Rechenzentrums-Bau, Strom,
-China-Plattformen, China-Chipfertigung, Marktbreite und Stress.
+China-KI-Modelle, China-Chipfertigung, Marktbreite und Stress.
+
+Die beiden China-Gruppen messen bewusst Verschiedenes: Die Modellseite prüft, ob
+chinesische KI durch **Effizienz** aufholt, die Fertigungsseite, ob sie es durch
+**eigene Hardware** tut. Beide können unabhängig voneinander recht haben.
 
 **Zehn abgeleitete Indikatoren**, die einzelne Kurse nicht zeigen:
 
@@ -89,8 +93,8 @@ China-Plattformen, China-Chipfertigung, Marktbreite und Stress.
 | Chips gegen Hyperscaler | wo der Markt das Risiko verortet |
 | Bau-Relativstärke | die Seite, auf der die Vertiv-Position sitzt |
 | Strom-Relativstärke | Engpassfaktor 2026 |
-| China-Relativstärke | Alibaba und Baidu, aber als ADR von US-Stimmung gefärbt |
-| China-Chipfertigung | SMIC, Cambricon, Hua Hong an den Heimatbörsen — die schärfere Gegenprobe |
+| China-KI-Relativstärke | Alibaba, Tencent, SenseTime, iFlytek, Kingsoft Cloud, Baidu — die Modellseite, der Kern der China-These |
+| China-Chipfertigung | SMIC, Cambricon, Hua Hong — die Hardwareseite. Misst etwas anderes und darf der Modellseite widersprechen |
 | Kreditrisiko-Aufschlag | Hochzins gegen erste Bonität, trennt Ausfallrisiko von Zinsbewegung |
 | Speicherpreise | Kostenseite der Capex-Rendite |
 

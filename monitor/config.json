@@ -100,12 +100,16 @@
       ],
       "rolle": "Engpassfaktor 2026. Bricht mit, wenn Projekte storniert werden."
     },
-    "China Internet und Cloud": {
+    "China KI-Modelle und Software": {
       "ticker": [
         "BABA",
+        "0700.HK",
+        "0020.HK",
+        "002230.SZ",
+        "KC",
         "BIDU"
       ],
-      "rolle": "Gegenprobe ueber die Plattformen. Achtung: als US-Hinterlegungsscheine gehandelt und daher stark von amerikanischer Stimmung gefaerbt."
+      "rolle": "Der Kern der China-These: Alibaba mit Qwen, Tencent mit Hunyuan, SenseTime, iFlytek, Kingsoft Cloud, Baidu mit Ernie. Hier zeigt sich, ob chinesische Modelle Boden gutmachen - nicht in den Fabriken."
     },
     "China Chipfertigung": {
       "ticker": [
@@ -114,7 +118,7 @@
         "688256.SS",
         "1347.HK"
       ],
-      "rolle": "Die eigentliche Gegenprobe: SMIC in Hongkong und Schanghai, Cambricon, Hua Hong. Kaeme Chinas guenstigere Hardware wirklich voran, muesste es sich hier zeigen."
+      "rolle": "Zweite, engere Probe: Hardware-Unabhaengigkeit. Misst etwas anderes als die Modellseite und darf ihr widersprechen."
     },
     "Markt und Stress": {
       "ticker": [

@@ -334,17 +334,18 @@ def indikatoren_bauen(kurse, gruppen):
         })
 
     # --- China-Gegenprobe ueber die Plattformen
-    china = gruppe_schnitt("China Internet und Cloud", "monat_prozent")
+    china = gruppe_schnitt("China KI-Modelle und Software", "monat_prozent")
     if china is not None and ndx is not None:
         rs = china - ndx
         ind.append({
-            "name": "China-Relativstaerke",
+            "name": "China-KI-Relativstaerke",
             "wert": rs,
             "einheit": "%-Pkt vs Nasdaq (1 Monat)",
-            "erklaerung": "Alibaba und Baidu gegen den Nasdaq. Als "
-                          "US-Hinterlegungsscheine bilden sie allerdings auch "
-                          "amerikanische Stimmung ab - deshalb steht daneben die "
-                          "Chipfertigung als schaerfere Probe.",
+            "erklaerung": "Chinesische Modell- und Softwarefirmen gegen den "
+                          "Nasdaq: Alibaba, Tencent, SenseTime, iFlytek, Kingsoft "
+                          "Cloud, Baidu. Das ist der Kern der China-These - "
+                          "Effizienz durch bessere Modelle, nicht durch eigene "
+                          "Fabriken.",
             "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
         })
 
@@ -417,7 +418,7 @@ def barometer_rechnen(indikatoren, nachrichten):
         "Bau-Relativstaerke": 1.5,
         "Chips gegen Hyperscaler": 1.2,
         "Konzentrations-Spread": 1.0,
-        "China-Relativstaerke": 0.5,
+        "China-KI-Relativstaerke": 1.0,
         "China-Chipfertigung": 1.0,
         "Strom-Relativstaerke": 0.8,
         "Kreditrisiko-Aufschlag": 1.0,
@@ -429,7 +430,7 @@ def barometer_rechnen(indikatoren, nachrichten):
         if gewicht is None:
             continue
         roh = ind["wert"]
-        if ind["name"] in ("China-Relativstaerke", "China-Chipfertigung"):
+        if ind["name"] in ("China-KI-Relativstaerke", "China-Chipfertigung"):
             roh = -roh          # dort ist Staerke gut fuer die These
         # -10 bis +10 Prozentpunkte auf -1..+1 abbilden, Vorzeichen drehen
         normiert = max(-1.0, min(1.0, -roh / 10.0))
