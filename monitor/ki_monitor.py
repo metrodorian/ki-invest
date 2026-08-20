@@ -1114,10 +1114,21 @@ def positionswert_verlauf(position, kurs):
     for i, d in enumerate(daten):
         wert = schein[i] * einstand * stueck
         punkte.append({"datum": d, "wert": max(0.0, wert), "vor_einstieg": i < anker_index})
+
+    # Der Vorlauf dient nur der Einordnung. Er wird gekuerzt, damit die Zeit
+    # seit dem Einstieg den Graphen bestimmt und nicht die Vorgeschichte.
+    # Mindestens 8 Tage Vorlauf, hoechstens so viele wie Haltetage.
+    haltetage = len(punkte) - 1 - anker_index
+    vorlauf = max(8, min(anker_index, max(8, haltetage)))
+    ab = max(0, anker_index - vorlauf)
+    punkte = punkte[ab:]
+    anker_index -= ab
+
     return {
         "name": position["name"], "wkn": position.get("wkn", ""),
         "punkte": punkte, "einsatz": einstand * stueck,
         "anker": anker_index,
+        "einstieg": einstieg.isoformat(),
     }
 
 
@@ -1160,6 +1171,17 @@ def wertverlauf_grafik(reihen, hoehe=190, breite=920):
                  'stroke-width="1"/>' % (links, yy, breite - rechts, yy))
         t.append('<text x="%.1f" y="%.1f" font-size="10" fill="var(--gedaempft)" '
                  'text-anchor="end">%d &#8364;</text>' % (links - 6, yy + 3, round(w)))
+
+    # Senkrechte Marke am Einstiegstag - alles links davon ist rechnerisch
+    erste = reihen[0]
+    xe = x(erste["anker"], len(erste["punkte"]))
+    t.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="var(--gedaempft)" '
+             'stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>'
+             % (xe, oben, xe, hoehe - unten))
+    t.append('<text x="%.1f" y="%d" font-size="10" font-weight="600" '
+             'fill="var(--gedaempft)" text-anchor="%s">Einstieg</text>'
+             % (xe + (5 if xe < breite * 0.7 else -5), oben + 9,
+                "start" if xe < breite * 0.7 else "end"))
 
     for nr, r in enumerate(reihen):
         farbe = FARBEN[nr % len(FARBEN)]
