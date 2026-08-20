@@ -311,7 +311,7 @@
   ],
   "claude": {
     "aktiv": true,
-    "befehl": "claude",
+    "befehl": "/home/Nutzer/.local/node/bin/claude",
     "zeitlimit_sekunden": 420,
     "modell": "opus"
   },
@@ -339,5 +339,45 @@
     "ton_alarm": "Basso"
   },
   "nachrichten_hoechstalter_tage": 14,
-  "bericht_kopie": "/Users/lennartduncker/MEGA/MEGAsync/Projekte/ki-invest/monitor/web/index.html"
+  "mail": {
+    "aktiv": true,
+    "an": "l.duncker@posteo.de",
+    "von": "KI-Invest Monitor <ki-invest@raspberrypi.local>",
+    "server": "127.0.0.1",
+    "port": 25,
+    "web_adresse": "http://192.168.178.20:8088/"
+  },
+  "bericht_kopie": "/home/Nutzer/ki-invest/web/index.html",
+  "hue": {
+    "aktiv": true,
+    "bridge": "192.168.178.21",
+    "schluessel_datei": "/home/Nutzer/ki-invest/hue.key",
+    "lampen": [
+      16,
+      10,
+      3
+    ],
+    "hue_kritisch": 0,
+    "hue_hoch": 6000,
+    "dauer_sekunden": 16,
+    "dauerblinken": true,
+    "dauerblink_lampen": [
+      3
+    ],
+    "nacht_von": 22,
+    "nacht_bis": 7,
+    "nacht_kontingent_sekunden": 300,
+    "telegram_takt_sekunden": 5
+  },
+  "ntfy": {
+    "aktiv": false,
+    "server": "https://ntfy.sh",
+    "kanal": null
+  },
+  "telegram": {
+    "aktiv": true,
+    "token_datei": "/home/Nutzer/ki-invest/telegram.token",
+    "chat_datei": "/home/Nutzer/ki-invest/telegram.chat"
+  },
+  "_hinweis": "Live-Konfiguration des Pi unter /home/Nutzer/ki-invest/config.json. Token und Schluessel stehen in eigenen Dateien mit Rechten 600 und gehoeren nicht ins Repo."
 }

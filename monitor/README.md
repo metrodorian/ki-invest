@@ -180,6 +180,58 @@ vermerkt das oben sichtbar.
 Abschalten lässt sich der Aufruf über `"claude": {"aktiv": false}` in der
 `config.json`.
 
+## Betrieb auf dem NAS
+
+Der Monitor läuft auf dem Raspberry Pi (OMV) unter `~/ki-invest`, gesteuert
+über cron. Der Mac ist abgeschaltet.
+
+| Wann | Was |
+|---|---|
+| werktags 15:45, 17:45, 19:45, 21:45 | Prüflauf; bei echten Alarmen fragt er Claude nach Eilbedarf |
+| werktags 22:30 | Bericht mit Mail an l.duncker@posteo.de |
+| beim Systemstart | Webserver auf Port 8088 |
+
+**Bericht im Browser:** http://192.168.178.20:8088/ — mit Archiv, Blättern über
+Pfeiltasten oder Knöpfe, und dem roten Balken zum Abstellen eines Alarms.
+
+### Eilmeldung
+
+Claude entscheidet bei jedem Lauf, ob ein Ereignis nicht bis zum Abendbericht
+warten kann. Die Auslöser sind im Prompt genau umrissen: Position in Gefahr,
+These gebrochen, These schlagartig bestätigt, Termin mit Folgen, sowie Ermessen
+für alles andere. Ausdrücklich **keine** Auslöser sind gewöhnliche Schwankung,
+Altmeldungen und Barometerbewegungen unter 15 Punkten.
+
+Wird sie ausgelöst, passiert alles zugleich:
+
+- **Telegram** sofort mit Zahlen und Handlungsmöglichkeiten, danach der Bericht
+  als Dokument
+- **Telegram alle 5 Sekunden** als Wiedervorlage, bis abgestellt
+- **Hue-Lampe** blinkt im selben Takt
+- **Mail** mit `X-Priority: 1` und roter Karte
+
+Nachts zwischen 22 und 7 Uhr gilt ein Kontingent von fünf Minuten. Danach
+schweigen Lampe und Telefon bis zum Morgen — der Alarm bleibt bestehen und
+nimmt um 7 Uhr die Arbeit wieder auf.
+
+**Abstellen** über den roten Balken auf der Berichtsseite. Lampe und
+Erinnerungen laufen im selben Vorgang, ein Knopf beendet beides und setzt die
+Lampe auf ihren vorherigen Zustand zurück.
+
+### Zugangsdaten
+
+Nichts davon steht im Repo oder in der Konfiguration:
+
+| Datei auf dem Pi | Inhalt |
+|---|---|
+| `telegram.token` | Bot-Token |
+| `telegram.chat` | Chat-Kennung |
+| `hue.key` | Schlüssel der Hue-Bridge |
+
+Alle mit Rechten 600. `config.pi.json` im Repo ist eine bereinigte Vorlage.
+
+Mail geht über den lokalen Postfix, deshalb sind dort keine Zugangsdaten nötig.
+
 ## Pflege
 
 In `config.json` aktuell halten:

@@ -890,6 +890,39 @@ keine Anglizismen wo ein deutsches Wort passt. Die Zusammenfassung soll erklaere
 was der Bericht bedeutet und was heute besonders war - so, dass man nach drei Saetzen
 Bescheid weiss.
 
+EILMELDUNG
+Zusaetzlich entscheidest du, ob dieser Bericht eine sofortige Warnmail
+rechtfertigt. Sie unterbricht den Nutzer ausserhalb des Tagesrhythmus - setze
+sie nur, wenn er die Lage HEUTE kennen muss, nicht erst heute Abend.
+
+Ausloeser sind ausschliesslich:
+
+1. POSITION IN GEFAHR: Barriere-Puffer unter 25 Prozent, oder ein Schein
+   naehert sich der Verlustschwelle von 30 Prozent, oder eine Tagesbewegung
+   von mehr als 3 Standardabweichungen gegen die Position.
+2. THESE GEBROCHEN: Ein Hyperscaler hebt die Capex-Prognose an, Nvidia gibt
+   eine starke Rechenzentrums-Guidance, oder ein Ausruester meldet steigenden
+   Auftragseingang. Also die Art Nachricht, nach der man die Position
+   ueberdenkt statt sie auszusitzen.
+3. THESE SCHLAGARTIG BESTAETIGT: Ein Effizienzdurchbruch bei Modellen im
+   Rang eines DeepSeek-Moments, eine angekuendigte Capex-Kuerzung, ein
+   grossflaechiger Baustopp, oder erstmals sichtbarer Finanzierungsstress
+   (Kreditrisiko-Aufschlag deutlich negativ). Auch Gutes kann eilig sein,
+   wenn es eine Gewinnmitnahme nahelegt.
+4. TERMIN MIT FOLGEN: Nvidia-Zahlen sind erschienen und weichen erkennbar
+   von der Erwartung ab.
+5. ETWAS, DAS IN KEINE DIESER SCHUBLADEN PASST, aber die Halte-Entscheidung
+   heute veraendert. Dafuer hast du Ermessen - begruende es dann kurz.
+
+Kein Ausloeser sind: gewoehnliche Tagesschwankung, wiederholte Altmeldungen,
+Barometerbewegungen unter 15 Punkten, allgemeine Blasen-Kommentare ohne neuen
+Sachverhalt. Im Zweifel keine Eilmeldung - eine falsche kostet mehr
+Aufmerksamkeit als eine verspaetete.
+
+Formuliere die Eilmeldung selbst, knapp und in ganzen Saetzen. Du bestimmst
+Betreff, Schlagzeile und Aufbau; die Felder sind ein Geruest, kein Korsett.
+Nenne konkrete Zahlen statt Adjektive.
+
 Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
 {"zusammenfassung": ["Satz 1", "Satz 2", "Satz 3"],
  "these_status": "bestaetigt|neutral|gefaehrdet",
@@ -901,7 +934,16 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
                 "quelle": "Kurzname oder URL"}],
  "datenwunsch": ["Konkret benannte Kennzahl oder Quelle, die dir fehlt"],
  "handlungsbedarf": "keiner|beobachten|dringend",
- "begruendung": "1-2 Saetze, warum dieser Handlungsbedarf"}
+ "begruendung": "1-2 Saetze, warum dieser Handlungsbedarf",
+ "eilmeldung": {"noetig": false,
+                "stufe": "hoch|kritisch",
+                "ausloeser": "welche der fuenf Nummern, oder eigene Begruendung",
+                "betreff": "Betreffzeile der Mail, unter 70 Zeichen",
+                "schlagzeile": "ein Satz, der die Lage auf den Punkt bringt",
+                "was_geschehen_ist": "2-3 Saetze zum Sachverhalt",
+                "warum_es_zaehlt": "2-3 Saetze zur Bedeutung fuer die Position",
+                "was_du_tun_koenntest": "konkrete Handlungsmoeglichkeiten, ohne Empfehlung",
+                "zahlen": ["Kennzahl: Wert", "Kennzahl: Wert"]}}
 """ % (
         konfig.get("zeitlimit_bis", "offen"),
         date.today().strftime("%d.%m.%Y"),
@@ -1055,7 +1097,16 @@ def alarme_sammeln(konfig, positionen, kurse, indikatoren, nachrichten,
 
 # =============================================================== Meldungen
 
+def ist_mac():
+    return sys.platform == "darwin"
+
+
 def systemmeldung(titel, text, ton=None):
+    """Mitteilung auf dem Mac. Auf dem Pi gibt es keine Oberflaeche - dort
+    landet die Warnung im Protokoll und per Mail."""
+    if not ist_mac():
+        log_schreiben("MELDUNG %s: %s" % (titel, text[:180]))
+        return
     sicher = re.sub(r'["\\]', "'", text)[:220]
     sicher_titel = re.sub(r'["\\]', "'", titel)[:60]
     befehl = 'display notification "%s" with title "%s"' % (sicher, sicher_titel)
@@ -1409,6 +1460,100 @@ def kernbox(indikatoren, gruppen_ansicht):
     return "".join(t)
 
 
+ALARMSCHALTER = """
+<div class="alarmleiste" id="alarmleiste" hidden>
+  <span class="puls"></span>
+  <span class="alarmtext"><b>Eilmeldung ausgeloest</b> &ndash; die Lampe blinkt,
+   bis du sie abstellst.</span>
+  <button type="button" id="alarmaus">Alarm abstellen</button>
+</div>
+<script>
+(function () {
+  var leiste = document.getElementById("alarmleiste");
+  var knopf = document.getElementById("alarmaus");
+  function pruefen() {
+    fetch("/blink/status", { cache: "no-store" })
+      .then(function (a) { return a.json(); })
+      .then(function (z) { leiste.hidden = !z.blinkt; })
+      .catch(function () { leiste.hidden = true; });
+  }
+  knopf.onclick = function () {
+    knopf.disabled = true;
+    knopf.textContent = "wird abgestellt \u2026";
+    fetch("/blink/stopp", { cache: "no-store" }).finally(function () {
+      setTimeout(function () {
+        leiste.hidden = true;
+        knopf.disabled = false;
+        knopf.textContent = "Alarm abstellen";
+      }, 1200);
+    });
+  };
+  pruefen();
+  setInterval(pruefen, 10000);
+})();
+</script>
+"""
+
+
+NAVIGATION = """
+<nav class="blaettern" id="blaettern" hidden>
+  <button type="button" id="zurueck" title="Aelterer Bericht (Pfeil links)"
+          aria-label="Aelterer Bericht">&#8592;</button>
+  <select id="auswahl" title="Bericht waehlen"></select>
+  <button type="button" id="vor" title="Neuerer Bericht (Pfeil rechts)"
+          aria-label="Neuerer Bericht">&#8594;</button>
+  <span id="stelle" class="stelle"></span>
+</nav>
+<script>
+(function () {
+  var wurzel = document.currentScript.parentElement;
+  var basis = wurzel.dataset.basis || "";
+  var selbst = wurzel.dataset.datei || "";
+  var nav = document.getElementById("blaettern");
+  var zurueck = document.getElementById("zurueck");
+  var vor = document.getElementById("vor");
+  var auswahl = document.getElementById("auswahl");
+  var stelle = document.getElementById("stelle");
+
+  fetch(basis + "index.json", { cache: "no-store" })
+    .then(function (a) { return a.json(); })
+    .then(function (liste) {
+      if (!liste || liste.length < 2) return;
+      liste.sort(function (a, b) { return a.datei < b.datei ? 1 : -1; });  // neueste zuerst
+      var hier = liste.findIndex(function (e) { return e.datei === selbst; });
+      if (hier < 0) hier = 0;
+
+      liste.forEach(function (e, i) {
+        var o = document.createElement("option");
+        o.value = e.datei;
+        o.textContent = e.beschriftung + (e.barometer != null ? "  \u00b7  " + e.barometer : "");
+        if (i === hier) o.selected = true;
+        auswahl.appendChild(o);
+      });
+
+      function hin(i) {
+        if (i < 0 || i >= liste.length) return;
+        location.href = basis + liste[i].datei;
+      }
+      zurueck.disabled = hier >= liste.length - 1;   // links = aelter
+      vor.disabled = hier <= 0;                      // rechts = neuer
+      zurueck.onclick = function () { hin(hier + 1); };
+      vor.onclick = function () { hin(hier - 1); };
+      auswahl.onchange = function () { location.href = basis + auswahl.value; };
+      stelle.textContent = (hier + 1) + " von " + liste.length;
+      document.addEventListener("keydown", function (e) {
+        if (e.target.tagName === "SELECT") return;
+        if (e.key === "ArrowLeft") { hin(hier + 1); }
+        if (e.key === "ArrowRight") { hin(hier - 1); }
+      });
+      nav.hidden = false;
+    })
+    .catch(function () { /* ohne Archiv bleibt die Navigation verborgen */ });
+})();
+</script>
+"""
+
+
 def barometer_verlauf_balken(verlauf, breite=232, hoehe=54):
     """
     Verlauf des Barometers als Abweichung von der Mitte.
@@ -1483,6 +1628,8 @@ STIL = """
 *{box-sizing:border-box}
 body{margin:0;padding:28px 20px 60px;background:var(--grund);color:var(--text);
  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.mailseite{max-width:760px;margin:0 auto}
+.mailseite .kernbox{margin:0 0 14px}
 .seite{max-width:1440px;margin:0 auto;display:grid;
  grid-template-columns:minmax(0,1fr) 304px;gap:22px;align-items:start}
 .inhalt{min-width:0}
@@ -1496,7 +1643,30 @@ h1{font-size:24px;margin:2px 0 2px;letter-spacing:-.01em}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
  color:var(--gedaempft);margin:34px 0 12px;font-weight:600}
 h3{font-size:14px;margin:20px 0 8px;font-weight:600}
-.kopf{color:var(--gedaempft);font-size:13px}
+.kopf{color:var(--gedaempft);font-size:13px;display:flex;align-items:center;
+ gap:12px;flex-wrap:wrap}
+.blaettern{display:flex;align-items:center;gap:6px;margin-left:auto}
+.blaettern button{font:inherit;font-size:14px;line-height:1;cursor:pointer;
+ background:var(--flaeche);color:var(--text);border:1px solid var(--rand);
+ border-radius:7px;padding:4px 10px}
+.blaettern button:hover:not(:disabled){border-color:var(--akzent);
+ color:var(--akzent)}
+.blaettern button:disabled{opacity:.35;cursor:default}
+.blaettern select{font:inherit;font-size:12.5px;background:var(--flaeche);
+ color:var(--text);border:1px solid var(--rand);border-radius:7px;padding:4px 8px;
+ max-width:260px}
+.blaettern .stelle{font-size:11.5px;color:var(--gedaempft);white-space:nowrap}
+.alarmleiste{display:flex;align-items:center;gap:12px;background:#b91c1c;
+ color:#fff;border-radius:11px;padding:13px 17px;margin:14px 0 4px;
+ font-size:14px;box-shadow:0 2px 10px rgba(185,28,28,.3)}
+.alarmleiste .alarmtext{flex:1}
+.alarmleiste button{font:inherit;font-weight:650;cursor:pointer;background:#fff;
+ color:#b91c1c;border:none;border-radius:8px;padding:8px 16px;white-space:nowrap}
+.alarmleiste button:hover:not(:disabled){background:#ffe9e9}
+.alarmleiste button:disabled{opacity:.6;cursor:default}
+.puls{width:11px;height:11px;border-radius:50%;background:#fff;flex:none;
+ animation:pulsieren 1.1s ease-in-out infinite}
+@keyframes pulsieren{0%,100%{opacity:1}50%{opacity:.25}}
 table{width:100%;border-collapse:collapse;font-size:14px;background:var(--flaeche);
  border-radius:10px;overflow:hidden;box-shadow:var(--schatten)}
 th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;
@@ -1555,8 +1725,8 @@ ul.liste li:last-child{border-bottom:none}
 .fazit .quelle{font-size:11px;text-transform:uppercase;letter-spacing:.06em;
  color:var(--gedaempft);border-top:1px solid var(--rand);
  padding-top:11px;margin:13px 0 10px;font-weight:600}
-.fazit p.gemessen{font-size:14px;color:var(--gedaempft);line-height:1.55}
-.fazit p.gemessen b{color:var(--text);font-weight:600}
+.fazit p.gemessen{font-size:14.5px;color:var(--text);line-height:1.58}
+.fazit p.gemessen b{color:var(--text);font-weight:640}
 .kernbox{background:var(--flaeche);border:1px solid var(--rand);border-radius:12px;
  padding:15px 16px;box-shadow:var(--schatten)}
 .kern-titel{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
@@ -1613,7 +1783,8 @@ ul.liste li:last-child{border-bottom:none}
 def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                   barometer, nachrichten, regierung, blogs, sec, alarme,
                   claude_urteil, fehler, zusammenfassung=None,
-                  barometer_verlauf=None):
+                  barometer_verlauf=None, fuer_mail=False,
+                  archiv_datei=None, archiv_basis=""):
     jetzt = datetime.now()
     heute = date.today()
     t = []
@@ -1630,10 +1801,16 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     t.append('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
              '<meta name="viewport" content="width=device-width,initial-scale=1">'
              '<title>KI-Invest Monitor</title><style>%s</style></head>'
-             '<body><div class="seite"><div class="inhalt">' % STIL)
+             '<body>%s' % (STIL, '<div class="mailseite">' if fuer_mail
+                              else '<div class="seite"><div class="inhalt">'))
 
-    t.append('<div class="kopf">%s%s</div><h1>KI-Invest Monitor</h1>'
-             % (jetzt.strftime("%A, %d.%m.%Y, %H:%M Uhr"), limit_text))
+    t.append('<div class="kopf" data-basis="%s" data-datei="%s">%s%s%s</div>'
+             '<h1>KI-Invest Monitor</h1>'
+             % (html_schuetzen(archiv_basis), html_schuetzen(archiv_datei or ""),
+                jetzt.strftime("%A, %d.%m.%Y, %H:%M Uhr"), limit_text,
+                "" if fuer_mail else NAVIGATION))
+    if not fuer_mail:
+        t.append(ALARMSCHALTER)
 
     # ---- Barometer
     wert, lage = barometer
@@ -1659,6 +1836,12 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     grafik = wertverlauf_grafik([p.get("wertverlauf") for p in positionen])
     if grafik:
         t.append(grafik)
+
+    # In der Mail steht der Kernindikator-Kasten direkt unter dem Graphen:
+    # E-Mail-Programme koennen das Rasterlayout nicht, dort wuerde die rechte
+    # Spalte sonst ans Ende der Nachricht rutschen.
+    if fuer_mail:
+        t.append(kernbox(indikatoren, gruppen_ansicht))
 
     # ---- Zusammenfassung in Worten
     claude_saetze = []
@@ -1975,10 +2158,13 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              'der Orderausfuehrung. Die Stichwort-Einordnung ist eine grobe '
              'Vorsortierung &ndash; die Bewertung bleibt bei dir. '
              'Konfiguration: <code>monitor/config.json</code>.</div>')
-    t.append("</div>")                              # Ende .inhalt
-    t.append('<aside class="rand">%s</aside>'
-             % kernbox(indikatoren, gruppen_ansicht))
-    t.append("</div></body></html>")                # Ende .seite
+    if fuer_mail:
+        t.append("</div></body></html>")            # Ende .mailseite
+    else:
+        t.append("</div>")                          # Ende .inhalt
+        t.append('<aside class="rand">%s</aside>'
+                 % kernbox(indikatoren, gruppen_ansicht))
+        t.append("</div></body></html>")            # Ende .seite
     return "\n".join(t)
 
 
@@ -2120,6 +2306,599 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     }
 
 
+def verzeichnis_schreiben(archiv, neue_datei, d, hoechstzahl=90):
+    """
+    Fuehrt das Verzeichnis der archivierten Berichte. Die Navigation liest es,
+    damit auch aeltere Seiten die jeweils passenden Nachbarn kennen, ohne dass
+    sie neu geschrieben werden muessten.
+    """
+    pfad = os.path.join(archiv, "index.json")
+    liste = json_laden(pfad, [])
+    liste = [e for e in liste if e.get("datei") != neue_datei]
+
+    jetzt = datetime.now()
+    reihen = [p.get("wertverlauf") for p in d.get("positionen", []) if p.get("wertverlauf")]
+    gesamt = sum(r["punkte"][-1]["wert"] for r in reihen) if reihen else None
+
+    liste.append({
+        "datei": neue_datei,
+        "beschriftung": jetzt.strftime("%d.%m.%Y, %H:%M"),
+        "barometer": d["barometer"][0],
+        "wert_eur": round(gesamt, 2) if gesamt is not None else None,
+    })
+    liste.sort(key=lambda e: e["datei"], reverse=True)
+
+    # Alte Berichte auch von der Platte nehmen
+    for veraltet in liste[hoechstzahl:]:
+        try:
+            os.remove(os.path.join(archiv, veraltet["datei"]))
+        except OSError:
+            pass
+    liste = liste[:hoechstzahl]
+
+    json_speichern(pfad, liste)
+    return liste
+
+
+def hue_signal(konfig, kritisch=True):
+    """
+    Laesst die Lampen bei einer Eilmeldung blinken - rot bei kritisch,
+    orange sonst. Der vorherige Zustand wird gesichert und danach wieder
+    hergestellt, damit die Beleuchtung nicht verstellt bleibt.
+
+    Nutzt die Hue-API Version 1 ueber HTTPS. Das Zertifikat der Bridge ist
+    selbst signiert, deshalb wird es hier bewusst nicht geprueft - es geht
+    um ein Geraet im eigenen Netz, nicht um eine Internetverbindung.
+    """
+    einst = konfig.get("hue", {})
+    if not einst.get("aktiv"):
+        return False
+
+    bridge = einst.get("bridge")
+    lampen = einst.get("lampen") or []
+    if not bridge or not lampen:
+        return False
+
+    schluessel = einst.get("schluessel")
+    if not schluessel and einst.get("schluessel_datei"):
+        try:
+            with open(einst["schluessel_datei"]) as f:
+                schluessel = f.read().strip()
+        except IOError:
+            return False
+    if not schluessel:
+        return False
+
+    ohne_pruefung = ssl.create_default_context()
+    ohne_pruefung.check_hostname = False
+    ohne_pruefung.verify_mode = ssl.CERT_NONE
+    stamm = "https://%s/api/%s/lights/" % (bridge, schluessel)
+
+    def anfrage(pfad, daten=None, methode="GET"):
+        koerper = json.dumps(daten).encode() if daten is not None else None
+        req = urllib.request.Request(stamm + pfad, data=koerper, method=methode,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=8,
+                                        context=ohne_pruefung) as antwort:
+                return json.loads(antwort.read().decode())
+        except Exception:                                        # noqa: BLE001
+            return None
+
+    # Zustand sichern
+    vorher = {}
+    for nr in lampen:
+        info = anfrage(str(nr))
+        if isinstance(info, dict) and "state" in info:
+            z = info["state"]
+            merken = {"on": z.get("on", False), "bri": z.get("bri", 200)}
+            for feld in ("hue", "sat", "ct"):
+                if feld in z:
+                    merken[feld] = z[feld]
+            vorher[nr] = (merken, "hue" in z)
+
+    # Signal setzen
+    farbton = einst.get("hue_kritisch", 0) if kritisch else einst.get("hue_hoch", 6000)
+    for nr, (_, kann_farbe) in vorher.items():
+        neuer = {"on": True, "bri": 254, "alert": "lselect"}
+        if kann_farbe:
+            neuer.update({"hue": farbton, "sat": 254})
+        else:
+            neuer["ct"] = 153 if kritisch else 400      # kalt bzw. warm
+        anfrage("%d/state" % nr, neuer, "PUT")
+
+    dauer = einst.get("dauer_sekunden", 16 if kritisch else 9)
+    time.sleep(dauer)
+
+    # Zustand zuruecksetzen
+    for nr, (merken, _) in vorher.items():
+        zurueck = dict(merken)
+        zurueck["alert"] = "none"
+        anfrage("%d/state" % nr, zurueck, "PUT")
+
+    log_schreiben("Hue: %d Lampen signalisiert (%s)"
+                  % (len(vorher), "kritisch" if kritisch else "hoch"))
+    return True
+
+
+def telegram_daten(konfig):
+    """Token und Chat-Kennung aus Dateien lesen - beide gehoeren nicht in die
+    Konfiguration, damit sie nicht versehentlich im Repo landen."""
+    einst = konfig.get("telegram", {})
+    if not einst.get("aktiv"):
+        return None, None
+
+    def lesen(wert, datei):
+        if wert:
+            return wert
+        if datei and os.path.exists(datei):
+            with open(datei) as f:
+                return f.read().strip()
+        return None
+
+    return (lesen(einst.get("token"), einst.get("token_datei")),
+            lesen(einst.get("chat"), einst.get("chat_datei")))
+
+
+def telegram_senden(konfig, text, still=False):
+    """Textnachricht an Telegram. Fett und kursiv ueber HTML-Auszeichnung."""
+    token, chat = telegram_daten(konfig)
+    if not token or not chat:
+        return False
+    daten = urllib.parse.urlencode({
+        "chat_id": chat, "text": text[:4000], "parse_mode": "HTML",
+        "disable_web_page_preview": "true",
+        "disable_notification": "true" if still else "false",
+    }).encode()
+    try:
+        with urllib.request.urlopen(
+                "https://api.telegram.org/bot%s/sendMessage" % token,
+                data=daten, timeout=20) as antwort:
+            json.loads(antwort.read())
+        log_schreiben("Telegram: Nachricht verschickt")
+        return True
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Telegram fehlgeschlagen: %s" % fehler)
+        return False
+
+
+def telegram_datei(konfig, inhalt, dateiname, beschriftung="", still=True):
+    """Haengt eine Datei als Dokument an - der Bericht wird so im Chat
+    dauerhaft ablegbar, nicht nur ein Link auf fremde Server."""
+    token, chat = telegram_daten(konfig)
+    if not token or not chat:
+        return False
+    if isinstance(inhalt, str):
+        inhalt = inhalt.encode("utf-8")
+
+    grenze = "----------KIInvest%s" % datetime.now().strftime("%H%M%S%f")
+    teile = []
+
+    def feld(name, wert):
+        teile.append(("--%s\r\nContent-Disposition: form-data; name=\"%s\"\r\n\r\n%s\r\n"
+                      % (grenze, name, wert)).encode("utf-8"))
+
+    feld("chat_id", chat)
+    if beschriftung:
+        feld("caption", beschriftung[:1000])
+        feld("parse_mode", "HTML")
+    feld("disable_notification", "true" if still else "false")
+    teile.append(("--%s\r\nContent-Disposition: form-data; name=\"document\"; "
+                  "filename=\"%s\"\r\nContent-Type: text/html\r\n\r\n"
+                  % (grenze, dateiname)).encode("utf-8"))
+    teile.append(inhalt)
+    teile.append(("\r\n--%s--\r\n" % grenze).encode("utf-8"))
+    koerper = b"".join(teile)
+
+    req = urllib.request.Request(
+        "https://api.telegram.org/bot%s/sendDocument" % token, data=koerper,
+        headers={"Content-Type": "multipart/form-data; boundary=%s" % grenze})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as antwort:
+            json.loads(antwort.read())
+        log_schreiben("Telegram: %s angehaengt (%d KB)"
+                      % (dateiname, len(inhalt) // 1024))
+        return True
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Telegram-Anhang %s fehlgeschlagen: %s" % (dateiname, fehler))
+        return False
+
+
+def ntfy_datei_senden(konfig, inhalt, dateiname, titel, text,
+                      kritisch=True, verweis=None, leise=False):
+    """
+    Wie ntfy_senden, haengt aber eine Datei an. Der Inhalt wird zu ntfy
+    hochgeladen, damit er auch ausserhalb des Heimnetzes lesbar ist - ein
+    Verweis auf die NAS-Adresse waere unterwegs wertlos.
+    """
+    einst = konfig.get("ntfy", {})
+    if not einst.get("aktiv") or not einst.get("kanal"):
+        return False
+
+    if isinstance(inhalt, str):
+        inhalt = inhalt.encode("utf-8")
+
+    # Kopfzeilen duerfen keine echten Zeilenumbrueche enthalten. ntfy setzt
+    # die Zeichenfolge Backslash-n selbst wieder in Umbrueche um.
+    einzeilig = text.replace("\r", "").replace("\n", "\\n")
+
+    kopf = {
+        "Title": titel.replace("\n", " ").encode("utf-8"),
+        "Message": einzeilig.encode("utf-8"),
+        "Filename": dateiname,
+        "Priority": "min" if leise else ("urgent" if kritisch else "high"),
+        "Tags": "page_facing_up" if leise else
+                ("rotating_light" if kritisch else "warning"),
+    }
+    if verweis:
+        kopf["Click"] = verweis
+
+    url = "%s/%s" % (einst.get("server", "https://ntfy.sh").rstrip("/"),
+                     einst["kanal"])
+    req = urllib.request.Request(url, data=inhalt, headers=kopf, method="PUT")
+    try:
+        with urllib.request.urlopen(req, timeout=45) as antwort:
+            antwort.read()
+        log_schreiben("ntfy: %s angehaengt (%d KB)"
+                      % (dateiname, len(inhalt) // 1024))
+        return True
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("ntfy-Anhang %s fehlgeschlagen: %s" % (dateiname, fehler))
+        return False
+
+
+def ntfy_senden(konfig, titel, text, kritisch=True, verweis=None):
+    """
+    Schickt eine Push-Nachricht ueber ntfy aufs Telefon.
+
+    Der Kanalname ist das einzige Geheimnis - wer ihn kennt, kann mitlesen
+    und senden. Deshalb ist er zufaellig gewaehlt und steht nur in der
+    Konfiguration auf dem Pi.
+    """
+    einst = konfig.get("ntfy", {})
+    if not einst.get("aktiv"):
+        return False
+    kanal = einst.get("kanal")
+    if not kanal:
+        return False
+
+    kopf = {
+        "Title": titel.encode("utf-8"),
+        "Priority": "urgent" if kritisch else "high",
+        "Tags": "rotating_light" if kritisch else "warning",
+        "Markdown": "no",
+    }
+    if verweis:
+        kopf["Click"] = verweis
+
+    url = "%s/%s" % (einst.get("server", "https://ntfy.sh").rstrip("/"), kanal)
+    req = urllib.request.Request(url, data=text.encode("utf-8"),
+                                 headers=kopf, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=12) as antwort:
+            antwort.read()
+        log_schreiben("ntfy verschickt (%s)" % ("dringend" if kritisch else "hoch"))
+        return True
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("ntfy fehlgeschlagen: %s" % fehler)
+        return False
+
+
+def dauerblinken_starten(alarmtext=""):
+    """Startet das Dauersignal als eigenstaendigen Vorgang, damit es den
+    Monitorlauf nicht blockiert. Laeuft dann, bis es abgestellt wird."""
+    skript = os.path.join(BASIS, "hue_blink.py")
+    if not os.path.exists(skript):
+        return False
+    # Text fuer die Wiedervorlagen hinterlegen, damit die Erinnerungen
+    # denselben Sachverhalt nennen wie die Erstmeldung.
+    try:
+        with open(os.path.join(BASIS, "alarm.txt"), "w") as f:
+            f.write(alarmtext or "")
+    except IOError:
+        pass
+    if os.path.exists(os.path.join(BASIS, "blink.laeuft")):
+        log_schreiben("Dauerblinken laeuft bereits")
+        return True
+    try:
+        subprocess.Popen([sys.executable, skript], cwd=BASIS,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        log_schreiben("Dauerblinken gestartet")
+        return True
+    except OSError as fehler:
+        log_schreiben("Dauerblinken nicht startbar: %s" % fehler)
+        return False
+
+
+def eilmeldung_verschicken(konfig, d, zustand):
+    """
+    Sofortmail bei Ereignissen, die nicht bis zum Abendbericht warten koennen.
+    Inhalt und Betreff stammen von Claude, die Form von hier. Jede Meldung
+    geht nur einmal raus - der Ausloeser wird im Zustand vermerkt.
+    """
+    urteil = d.get("claude") or {}
+    eil = urteil.get("eilmeldung") or {}
+    if not isinstance(eil, dict) or not eil.get("noetig"):
+        return False
+
+    einst = konfig.get("mail", {})
+    empfaenger = einst.get("an")
+    if not empfaenger:
+        return False
+
+    # Nicht zweimal dasselbe. Der Betreff dient als Erkennungsmerkmal.
+    kennung = (eil.get("betreff") or "")[:90]
+    gesendet = zustand.get("eilmeldungen", [])
+    if kennung and kennung in gesendet:
+        log_schreiben("Eilmeldung schon verschickt: %s" % kennung[:60])
+        return False
+
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formatdate
+
+    kritisch = (eil.get("stufe") == "kritisch")
+    signal = "\u26a0\ufe0f" if kritisch else "\u2757"
+    farbe = "#b91c1c" if kritisch else "#b45309"
+    wert, lage = d["barometer"]
+
+    betreff = eil.get("betreff") or "Eilmeldung zur KI-Invest-Position"
+    nachricht = EmailMessage()
+    nachricht["From"] = einst.get("von", "ki-invest@localhost")
+    nachricht["To"] = empfaenger
+    nachricht["Subject"] = "%s EILMELDUNG: %s" % (signal, betreff)
+    nachricht["Date"] = formatdate(localtime=True)
+    nachricht["X-Priority"] = "1"
+    nachricht["X-MSMail-Priority"] = "High"
+    nachricht["Importance"] = "high"
+    nachricht["Priority"] = "urgent"
+
+    zahlen = [z for z in (eil.get("zahlen") or []) if isinstance(z, str)]
+    positionen = d.get("positionen", [])
+
+    klartext = ["EILMELDUNG - %s" % (eil.get("schlagzeile") or betreff), "",
+                eil.get("was_geschehen_ist") or "", "",
+                "WARUM ES ZAEHLT", eil.get("warum_es_zaehlt") or "", "",
+                "MOEGLICHE SCHRITTE", eil.get("was_du_tun_koennte")
+                or eil.get("was_du_tun_koenntest") or "", ""]
+    if zahlen:
+        klartext += ["ZAHLEN"] + ["  " + z for z in zahlen] + [""]
+    klartext.append("Barometer %d von 100 (%s)" % (wert, lage))
+    for p in positionen:
+        klartext.append("  %s: Basiswert %.2f (%+.2f%%), Puffer %s"
+                        % (p["name"], p["kurs"], p["tag_prozent"],
+                           ("%.1f%%" % p["barriere_abstand"])
+                           if p.get("barriere_abstand") is not None else "?"))
+    if einst.get("web_adresse"):
+        klartext += ["", "Vollstaendiger Bericht: " + einst["web_adresse"]]
+    nachricht.set_content("\n".join(z for z in klartext if z is not None))
+
+    def kachel(p):
+        puffer = p.get("barriere_abstand")
+        return ('<td style="padding:9px 12px;border:1px solid #e2e5ea;'
+                'border-radius:8px;font:13px -apple-system,Segoe UI,sans-serif">'
+                '<b>%s</b><br><span style="color:#68707b">Basiswert %.2f &middot; '
+                '<span style="color:%s">%+.2f%%</span><br>Puffer %s</span></td>'
+                % (p["name"], p["kurs"],
+                   "#15803d" if p["tag_prozent"] < 0 else "#b91c1c",
+                   p["tag_prozent"],
+                   ("%.1f%%" % puffer) if puffer is not None else "&ndash;"))
+
+    html = """<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f2f3f5">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0"
+ style="background:#f2f3f5;padding:22px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0"
+ style="max-width:640px;background:#fff;border-radius:14px;overflow:hidden;
+ box-shadow:0 2px 10px rgba(0,0,0,.09)">
+
+<tr><td style="background:%(farbe)s;padding:20px 26px">
+  <div style="font:700 11px/1 -apple-system,Segoe UI,sans-serif;
+   letter-spacing:.22em;color:rgba(255,255,255,.82);text-transform:uppercase">
+   %(signal)s &nbsp;Eilmeldung &middot; %(stufe)s</div>
+  <div style="font:700 23px/1.28 -apple-system,Segoe UI,sans-serif;color:#fff;
+   margin-top:9px">%(schlagzeile)s</div>
+</td></tr>
+
+<tr><td style="padding:24px 26px 6px;font:15px/1.6 -apple-system,Segoe UI,sans-serif;color:#16191d">
+  <p style="margin:0 0 18px">%(geschehen)s</p>
+  <div style="font:700 11px/1 -apple-system,Segoe UI,sans-serif;letter-spacing:.1em;
+   color:#68707b;text-transform:uppercase;margin-bottom:7px">Warum es zaehlt</div>
+  <p style="margin:0 0 18px">%(warum)s</p>
+  <div style="font:700 11px/1 -apple-system,Segoe UI,sans-serif;letter-spacing:.1em;
+   color:#68707b;text-transform:uppercase;margin-bottom:7px">Moegliche Schritte</div>
+  <p style="margin:0 0 18px">%(schritte)s</p>
+  %(zahlenblock)s
+</td></tr>
+
+<tr><td style="padding:4px 26px 20px">
+  <table role="presentation" width="100%%" cellpadding="0" cellspacing="6"><tr>%(kacheln)s</tr></table>
+  <div style="font:13px -apple-system,Segoe UI,sans-serif;color:#68707b;
+   margin-top:12px">Barometer <b style="color:#16191d">%(baro)d von 100</b> &middot; %(lage)s</div>
+</td></tr>
+
+<tr><td style="padding:0 26px 26px">
+  <a href="%(web)s" style="display:inline-block;background:#1d4ed8;color:#fff;
+   text-decoration:none;font:600 14px -apple-system,Segoe UI,sans-serif;
+   padding:12px 22px;border-radius:9px">Vollstaendigen Bericht oeffnen</a>
+</td></tr>
+
+<tr><td style="background:#f7f8fa;padding:15px 26px;font:11.5px/1.55 -apple-system,
+ Segoe UI,sans-serif;color:#68707b;border-top:1px solid #e2e5ea">
+  Automatisch erzeugt, weil dieser Sachverhalt die Halte-Entscheidung heute
+  beruehren koennte &ndash; Ausloeser: %(ausloeser)s. Kursdaten koennen verzoegert
+  sein. Die Bewertung bleibt bei dir.
+</td></tr>
+
+</table></td></tr></table></body></html>""" % {
+        "farbe": farbe, "signal": signal,
+        "stufe": "kritisch" if kritisch else "hohe Dringlichkeit",
+        "schlagzeile": html_schuetzen(eil.get("schlagzeile") or betreff),
+        "geschehen": html_schuetzen(eil.get("was_geschehen_ist") or ""),
+        "warum": html_schuetzen(eil.get("warum_es_zaehlt") or ""),
+        "schritte": html_schuetzen(eil.get("was_du_tun_koenntest")
+                                   or eil.get("was_du_tun_koennte") or ""),
+        "zahlenblock": ('<table role="presentation" width="100%%" cellpadding="0" '
+                        'cellspacing="0" style="background:#f7f8fa;border-radius:9px;'
+                        'padding:12px 14px;margin-bottom:6px"><tr><td '
+                        'style="font:13px/1.75 -apple-system,Segoe UI,sans-serif;'
+                        'color:#16191d">%s</td></tr></table>'
+                        % "<br>".join(html_schuetzen(z) for z in zahlen)) if zahlen else "",
+        "kacheln": "".join(kachel(p) for p in positionen),
+        "baro": wert, "lage": html_schuetzen(lage),
+        "web": html_schuetzen(einst.get("web_adresse", "#")),
+        "ausloeser": html_schuetzen(str(eil.get("ausloeser", "Ermessen"))[:120]),
+    }
+    nachricht.add_alternative(html, subtype="html")
+
+    try:
+        server = smtplib.SMTP(einst.get("server", "127.0.0.1"),
+                              einst.get("port", 25), timeout=30)
+        server.send_message(nachricht)
+        server.quit()
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Eilmeldung fehlgeschlagen: %s" % fehler)
+        return False
+
+    marke = date.today().strftime("%Y-%m-%d")
+    kurztext = ((eil.get("schlagzeile") or "") + "\n\n"
+                + (eil.get("was_geschehen_ist") or ""))
+
+    # --- Telegram: erst die Meldung laut, dann der Bericht still hinterher
+    try:
+        signalwort = "KRITISCH" if kritisch else "EILMELDUNG"
+        zeilen = ["%s <b>%s</b>" % (signal, signalwort), "",
+                  "<b>%s</b>" % html_schuetzen(eil.get("schlagzeile") or betreff), ""]
+        if eil.get("was_geschehen_ist"):
+            zeilen += [html_schuetzen(eil["was_geschehen_ist"]), ""]
+        if eil.get("warum_es_zaehlt"):
+            zeilen += ["<b>Warum es zaehlt</b>",
+                       html_schuetzen(eil["warum_es_zaehlt"]), ""]
+        if eil.get("was_du_tun_koenntest"):
+            zeilen += ["<b>Moegliche Schritte</b>",
+                       html_schuetzen(eil["was_du_tun_koenntest"]), ""]
+        if zahlen:
+            zeilen += ["<b>Zahlen</b>"] + ["  " + html_schuetzen(z) for z in zahlen] + [""]
+        zeilen.append("Barometer <b>%d von 100</b> &#183; %s"
+                      % (wert, html_schuetzen(lage)))
+        for p in positionen:
+            puffer = p.get("barriere_abstand")
+            zeilen.append("  %s: %.2f (%+.2f%%), Puffer %s"
+                          % (html_schuetzen(p["name"]), p["kurs"], p["tag_prozent"],
+                             ("%.1f%%" % puffer) if puffer is not None else "?"))
+        if einst.get("web_adresse"):
+            zeilen += ["", '<a href="%s">Vollstaendiger Bericht</a>'
+                       % html_schuetzen(einst["web_adresse"])]
+
+        telegram_senden(konfig, "\n".join(zeilen), still=False)
+
+        bericht = d.get("mail_html")
+        if not bericht:
+            try:
+                with open(BERICHT_PFAD) as f:
+                    bericht = f.read()
+            except IOError:
+                bericht = None
+        if bericht:
+            telegram_datei(konfig, bericht, "bericht-%s.html" % marke,
+                           "Vollstaendiger Bericht zum Nachlesen", still=True)
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Telegram-Aufruf fehlgeschlagen: %s" % fehler)
+
+    # --- ntfy nur noch, wenn ausdruecklich eingeschaltet
+    try:
+        if konfig.get("ntfy", {}).get("aktiv"):
+            if not ntfy_datei_senden(konfig, html, "eilmeldung-%s.html" % marke,
+                                     ("Kritisch: " if kritisch else "") + betreff,
+                                     kurztext, kritisch, einst.get("web_adresse")):
+                ntfy_senden(konfig, ("Kritisch: " if kritisch else "") + betreff,
+                            kurztext, kritisch, einst.get("web_adresse"))
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("ntfy-Aufruf fehlgeschlagen: %s" % fehler)
+
+    try:
+        if konfig.get("hue", {}).get("dauerblinken"):
+            dauerblinken_starten(eil.get("schlagzeile") or betreff)
+        else:
+            hue_signal(konfig, kritisch)
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Hue-Signal fehlgeschlagen: %s" % fehler)
+
+    gesendet.append(kennung)
+    zustand["eilmeldungen"] = gesendet[-40:]
+    log_schreiben("EILMELDUNG verschickt (%s): %s"
+                  % (eil.get("stufe", "hoch"), betreff[:70]))
+    systemmeldung("KI-Invest EILMELDUNG", betreff, "Basso")
+    return True
+
+
+def bericht_mailen(konfig, d):
+    """
+    Schickt den Bericht als HTML-Mail. Nutzt den lokalen Mailserver, damit
+    keine Zugangsdaten im Skript stehen muessen.
+    """
+    einst = konfig.get("mail", {})
+    if not einst.get("aktiv"):
+        return
+    empfaenger = einst.get("an")
+    if not empfaenger:
+        log_schreiben("Mail: kein Empfaenger hinterlegt")
+        return
+
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formatdate
+
+    wert, lage = d["barometer"]
+    positionen = d.get("positionen", [])
+    gesamt = summe_ein = None
+    reihen = [p.get("wertverlauf") for p in positionen if p.get("wertverlauf")]
+    if reihen:
+        gesamt = sum(r["punkte"][-1]["wert"] for r in reihen)
+        summe_ein = sum(r["einsatz"] for r in reihen)
+
+    betreff = "KI-Invest %s: Barometer %d" % (date.today().strftime("%d.%m."), wert)
+    if gesamt is not None:
+        betreff += " | %.0f EUR (%+.0f)" % (gesamt, gesamt - summe_ein)
+    echte = [t for stufe, t in d.get("alarme", []) if stufe == "alarm"]
+    if echte:
+        betreff += " | %d Auffaelligkeiten" % len(echte)
+
+    nachricht = EmailMessage()
+    nachricht["From"] = einst.get("von", "ki-invest@localhost")
+    nachricht["To"] = empfaenger
+    nachricht["Subject"] = betreff
+    nachricht["Date"] = formatdate(localtime=True)
+
+    klartext = ["Barometer %d von 100 (%s)" % (wert, lage), ""]
+    for satz in (d.get("zusammenfassung") or [])[:4]:
+        klartext.append("- " + re.sub(r"<[^>]+>", "", satz))
+    if einst.get("web_adresse"):
+        klartext += ["", "Im Browser: " + einst["web_adresse"]]
+    nachricht.set_content("\n".join(klartext))
+
+    html = d.get("mail_html")
+    if not html:
+        try:
+            with open(BERICHT_PFAD) as f:
+                html = f.read()
+        except IOError:
+            html = None
+    if html:
+        nachricht.add_alternative(html, subtype="html")
+
+    try:
+        server = smtplib.SMTP(einst.get("server", "127.0.0.1"),
+                              einst.get("port", 25), timeout=30)
+        server.send_message(nachricht)
+        server.quit()
+        log_schreiben("Mail an %s verschickt" % empfaenger)
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Mailversand fehlgeschlagen: %s" % fehler)
+
+
 def neuheiten_markieren(nachrichten, zustand):
     """Kennzeichnet Meldungen, die seit dem letzten Bericht dazugekommen sind."""
     bekannt = set(zustand.get("gesehene_meldungen", []))
@@ -2133,17 +2912,44 @@ def neuheiten_markieren(nachrichten, zustand):
         aktuell + list(bekannt)))[:800]
 
 
-def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None):
+def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None, fuer_mail=False):
     konfig["_verworfen"] = d.get("verworfen", 0)
-    html = bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
-                         d["indikatoren"], d["barometer"], d["nachrichten"],
-                         d["regierung"], d["blogs"], d["sec"], d["alarme"],
-                         d.get("claude"), d["fehler"], d.get("zusammenfassung"),
-                         barometer_verlauf)
+    archiv_name = datetime.now().strftime("%Y-%m-%d-%H%M.html")
+
+    def bauen(mailfassung, basis=""):
+        return bericht_bauen(konfig, d["positionen"], d["kurse"], d["gruppen"],
+                             d["indikatoren"], d["barometer"], d["nachrichten"],
+                             d["regierung"], d["blogs"], d["sec"], d["alarme"],
+                             d.get("claude"), d["fehler"], d.get("zusammenfassung"),
+                             barometer_verlauf, mailfassung,
+                             archiv_name, basis)
+
+    html = bauen(False)
+    if konfig.get("mail", {}).get("aktiv"):
+        d["mail_html"] = bauen(True)
     with open(BERICHT_PFAD, "w") as f:
         f.write(html)
-    if oeffnen:
+    if oeffnen and ist_mac():
         subprocess.run(["open", BERICHT_PFAD], check=False)
+
+    # Ablage fuer den Webserver samt Archiv. Die Startseite liegt eine Ebene
+    # ueber dem Archiv, deshalb bekommt sie den Basispfad "archiv/" mit.
+    ziel = konfig.get("bericht_kopie")
+    if ziel:
+        try:
+            web = os.path.dirname(ziel)
+            archiv = os.path.join(web, "archiv")
+            os.makedirs(archiv, exist_ok=True)
+
+            with open(os.path.join(archiv, archiv_name), "w") as f:
+                f.write(bauen(False, ""))
+            with open(ziel, "w") as f:
+                f.write(bauen(False, "archiv/"))
+
+            verzeichnis_schreiben(archiv, archiv_name, d,
+                                  konfig.get("archiv_hoechstzahl", 90))
+        except OSError as fehler:
+            log_schreiben("Kopie nach %s fehlgeschlagen: %s" % (ziel, fehler))
 
 
 def nur_claude_neu(konfig, oeffnen):
@@ -2209,6 +3015,17 @@ def main():
     if modus == "watch":
         frisch = neue_alarme(d["alarme"], zustand)
         melden(konfig, frisch)
+        # Nur wenn wirklich etwas Neues von Alarmstufe vorliegt, wird Claude
+        # zur Einschaetzung gefragt - sonst liefe bei jedem Lauf eine Anfrage.
+        echte = [t for stufe, t in frisch if stufe == "alarm"]
+        if echte and konfig.get("eilmeldung_aktiv", True):
+            log_schreiben("watch: %d neue Alarme, frage Claude nach Eilbedarf"
+                          % len(echte))
+            d["claude"] = claude_fragen(
+                konfig, d["positionen"], d["indikatoren"], d["barometer"],
+                d["nachrichten"], d["regierung"], d["blogs"], d["sec"])
+            if d["claude"] and not d["claude"].get("fehler"):
+                eilmeldung_verschicken(konfig, d, zustand)
         log_schreiben("watch: Barometer %d, %d Auffaelligkeiten (%d neu), "
                       "%d Abrufprobleme" % (d["barometer"][0], len(d["alarme"]),
                                             len(frisch), len(d["fehler"])))
@@ -2226,6 +3043,9 @@ def main():
             json_speichern(DATEN_PFAD, d)
         except (TypeError, ValueError) as f:
             log_schreiben("Hinweis: Daten nicht sicherbar (%s)" % f)
+        if modus == "report":
+            eilmeldung_verschicken(konfig, d, zustand)
+            bericht_mailen(konfig, d)
         zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
         log_schreiben("%s: Barometer %d, %d Auffaelligkeiten, %d Nachrichten, "
                       "%d Abrufprobleme -> %s"
