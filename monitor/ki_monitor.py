@@ -215,9 +215,17 @@ def scheinkurs_holen(isin, kennung):
                               if (geld and brief) else None}
 
 
-# Schluessel, die nie in die geteilte Datei gehoeren: Zugangsdaten, Rechnerpfade
-# und Laufzeitzustand. Alles andere ist auf jedem Rechner gleich.
-LOKALE_SCHLUESSEL = ("mail", "telegram", "hue", "bericht_kopie", "ruhe_bis")
+# Zugangsdaten, Rechnerpfade und die Rolle. Sie werden aus der lokalen Auflage
+# gelesen und NIE zurueckgeschrieben - ein Aufrufer mit veraltetem Stand koennte
+# sie sonst loeschen. Genau so ist heute die Meldekette verschwunden.
+GESCHUETZTE_SCHLUESSEL = ("mail", "telegram", "hue", "bericht_kopie", "rolle")
+
+# Laufzeitzustand: gehoert ebenfalls nicht in die geteilte Datei (eine
+# Stummschaltung vom Mac darf den Pi nicht verstummen lassen), darf aber
+# gesetzt und wieder aufgehoben werden.
+ZUSTAND_SCHLUESSEL = ("ruhe_bis", "notiz")
+
+LOKALE_SCHLUESSEL = GESCHUETZTE_SCHLUESSEL + ZUSTAND_SCHLUESSEL
 
 
 def konfig_laden():
@@ -260,16 +268,24 @@ def konfig_speichern(konfig):
     identisch und kopierbar, ohne dass Zugangsdaten mitwandern oder eine
     Stummschaltung vom einen Rechner den anderen verstummen laesst.
     """
-    geteilt, lokal = {}, {}
-    for schluessel, wert in konfig.items():
-        if schluessel.startswith("_"):
-            continue
-        (lokal if schluessel in LOKALE_SCHLUESSEL else geteilt)[schluessel] = wert
-    # Werte, die die lokale Auflage schon kannte, aber gerade nicht gesetzt sind
-    # (etwa eine aufgehobene Stummschaltung), fallen damit sauber weg.
     vorher = json_laden(LOKAL_PFAD, {}) or {}
-    if "_hinweis" in vorher:
-        lokal["_hinweis"] = vorher["_hinweis"]
+
+    # Geschuetzte Schluessel bleiben so stehen, wie sie in der Datei stehen -
+    # unabhaengig davon, was der Aufrufer im Speicher hat.
+    lokal = {k: v for k, v in vorher.items()
+             if k in GESCHUETZTE_SCHLUESSEL or k.startswith("_")}
+
+    geteilt = {}
+    for schluessel, wert in konfig.items():
+        if schluessel.startswith("_") or schluessel in GESCHUETZTE_SCHLUESSEL:
+            continue
+        if schluessel in ZUSTAND_SCHLUESSEL:
+            # Fehlt der Wert im Aufruf, gilt er als aufgehoben.
+            if wert is not None:
+                lokal[schluessel] = wert
+        else:
+            geteilt[schluessel] = wert
+
     json_speichern(CONFIG_PFAD, geteilt)
     json_speichern(LOKAL_PFAD, lokal)
 
