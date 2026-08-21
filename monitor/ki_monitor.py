@@ -286,6 +286,21 @@ def konfig_speichern(konfig):
         else:
             geteilt[schluessel] = wert
 
+    # Notbremse: Ein Aufrufer, der nur einen Ausschnitt im Speicher hat, wuerde
+    # den Rest wortlos loeschen. Genau so ist die Konfiguration heute zweimal
+    # verlorengegangen. Ein plausibler Schreibvorgang aendert Werte, nicht die
+    # Anzahl der Schluessel.
+    bestand = json_laden(CONFIG_PFAD, {}) or {}
+    if len(bestand) > 4 and len(geteilt) < len(bestand) * 0.7:
+        log_schreiben("Schreibversuch abgelehnt: nur %d von %d Schluesseln "
+                      "uebergeben - vermutlich ein unvollstaendiger Aufruf"
+                      % (len(geteilt), len(bestand)))
+        raise ValueError(
+            "konfig_speichern haette %d von %d Schluesseln geloescht. "
+            "Der Aufrufer muss die vollstaendige Konfiguration uebergeben, "
+            "also die von konfig_laden() zurueckgegebene."
+            % (len(bestand) - len(geteilt), len(bestand)))
+
     json_speichern(CONFIG_PFAD, geteilt)
     json_speichern(LOKAL_PFAD, lokal)
 
