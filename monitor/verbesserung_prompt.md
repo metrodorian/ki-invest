@@ -43,6 +43,18 @@ Filter; ein Einzelfall nicht.
 Arbeite die drei Arten in dieser Reihenfolge ab: erst `filterfehler` (billig zu
 beheben, wirkt sofort aufs Barometer), dann `uebersehen`, dann `datenwunsch`.
 
+Jeder Eintrag trägt ein Feld `genannt`. Es zählt, wie oft derselbe Vorschlag in
+den Läufen dieser Woche aufkam — nahezu gleiche Formulierungen werden
+zusammengefasst. **Eine hohe Zahl wiegt schwer:** Ein Wunsch, der zwanzigmal
+kam, hat dir zwanzigmal beim Urteilen gefehlt. Ein Einzelfall kann eine
+Tagesbeobachtung sein. Nimm die Zahl als Rangfolge innerhalb einer Art, nicht
+als Ersatz für die vier Bedingungen.
+
+Wurde ein Vorschlag in einer früheren Woche schon verworfen und kommt erneut,
+steht der damalige Grund unter `ergebnis`. Prüfe, ob er noch gilt — eine Quelle,
+die es letzten Monat nicht gab, kann es heute geben —, aber wiederhole nicht
+dieselbe vergebliche Suche.
+
 ## Was ein guter Vorschlag ist
 
 Ein Vorschlag ist umsetzenswert, wenn **alle vier** Punkte zutreffen:

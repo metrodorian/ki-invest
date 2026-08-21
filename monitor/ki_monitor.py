@@ -314,6 +314,59 @@ CHINESISCHE_ANBIETER = ("deepseek", "tencent", "xiaomi", "z-ai", "zhipu", "aliba
                         "01-ai", "bytedance", "stepfun", "inclusionai")
 
 
+def marktanteil_auswerten(konfig, nutzung):
+    """
+    Stellt den gemeldeten Verlauf des chinesischen Anteils am Tokenverkehr
+    neben die eigene laufende Messung.
+
+    Warum beides getrennt und nicht in einer Reihe: Die gemeldeten Marken
+    stammen aus einer Auswertung des UNTERNEHMENSverkehrs der OpenRouter-
+    Rangliste, die eigene Messung liest die Rangliste als GANZES - also
+    einschliesslich Bastel- und Freikontingent-Verkehr. Das sind zwei
+    verschiedene Grundgesamtheiten. Die eigene Zahl liegt deshalb
+    systematisch hoeher und ist KEINE Fortschreibung der gemeldeten Reihe;
+    in eine gemeinsame Kurve gezeichnet ergaebe das einen Anstieg, den es
+    so nie gab.
+
+    Aussagekraeftig ist die Richtung, nicht die Hoehe.
+    """
+    einst = konfig.get("marktanteil") or {}
+    marken = list(einst.get("marken") or [])
+    if not marken:
+        return None
+
+    zeilen = [dict(m, gemessen=False) for m in marken]
+
+    # Eigene Messreihe danebenstellen - Spanne und aktueller Stand.
+    verlauf = [e for e in ((nutzung or {}).get("verlauf") or [])
+               if e.get("anteil_china_prozent") is not None]
+    if verlauf:
+        werte = [e["anteil_china_prozent"] for e in verlauf]
+        tief = min(verlauf, key=lambda e: e["anteil_china_prozent"])
+        hoch = max(verlauf, key=lambda e: e["anteil_china_prozent"])
+        jetzt = verlauf[-1]
+        if len(verlauf) >= 2 and abs(hoch["anteil_china_prozent"]
+                                     - tief["anteil_china_prozent"]) > 0.05:
+            zeilen.append({
+                "zeitraum": u"eigene Messung, Spanne seit %s" % verlauf[0]["datum"],
+                "wert": round(sum(werte) / len(werte), 1),
+                "art": u"Mittel (%.1f bis %.1f)" % (tief["anteil_china_prozent"],
+                                                    hoch["anteil_china_prozent"]),
+                "erhebung": u"eigene Messung, ganze Rangliste",
+                "gemessen": True})
+        zeilen.append({
+            "zeitraum": u"eigene Messung, Stand %s" % jetzt["datum"],
+            "wert": jetzt["anteil_china_prozent"],
+            "art": u"Wochenwert",
+            "erhebung": u"eigene Messung, ganze Rangliste",
+            "gemessen": True})
+
+    return {"zeilen": zeilen,
+            "quelle": einst.get("quelle", "?"),
+            "stand": einst.get("stand", "?"),
+            "hinweis": einst.get("hinweis", "")}
+
+
 def tokennutzung_holen(kennung):
     """
     Liest von der OpenRouter-Rangliste, wie viele Token je Anbieter tatsaechlich
@@ -396,14 +449,39 @@ def tokennutzung_holen(kennung):
 
     veraenderung = None
     vergleich = None
+    # Die OpenRouter-Rangliste ist ein rollender WOCHENwert: Zwischen gestern und
+    # heute wechselt nur ein Siebtel der Grundlage. Ein Vergleich mit dem
+    # Vortag misst darum fast nichts, waehrend die Schwellen des Indikators
+    # (plus/minus ein Punkt) auf eine Wochenveraenderung geeicht sind. Deshalb
+    # den Eintrag suchen, der mindestens sechs Tage zurueckliegt.
+    heute = date.today()
     for frueher in reversed(verlauf[:-1]):
-        if frueher.get("anteil_china_prozent") is not None:
-            veraenderung = jetzt["anteil_china_prozent"] - frueher["anteil_china_prozent"]
-            vergleich = frueher["datum"]
-            break
+        if frueher.get("anteil_china_prozent") is None:
+            continue
+        try:
+            alter = (heute - date.fromisoformat(frueher["datum"])).days
+        except (TypeError, ValueError):
+            continue
+        if alter < 6:
+            continue
+        veraenderung = jetzt["anteil_china_prozent"] - frueher["anteil_china_prozent"]
+        vergleich = frueher["datum"]
+        break
 
     return {"jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
             "verlauf": verlauf[-30:]}
+
+
+def modell_releases_text(konfig):
+    """Die erwarteten Veroeffentlichungen als Text fuer den Claude-Aufruf."""
+    rel = (konfig.get("modell_releases") or {}).get("erwartet") or []
+    if not rel:
+        return "  (keine hinterlegt)"
+    return "\n".join(
+        "  %-2s %-16s %-26s [%s]\n      %s"
+        % (e.get("land", "?"), e.get("modell", "?"), e.get("erwartet", "offen"),
+           e.get("sicherheit", "?"), e.get("bedeutung", ""))
+        for e in rel)
 
 
 def kennzahlen_text(konfig):
@@ -1015,6 +1093,13 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if monat_bp < -25 else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": monat_bp,
+            # Fuer die Rangfolge in der Zusammenfassung zaehlt die Bewegung, nicht
+            # der Stand: 273 Basispunkte sind die groesste Zahl im Feld, sagen aber
+            # fuer sich nichts. Durch fuenf geteilt, damit Basispunkte und
+            # Prozentpunkte vergleichbar werden - dieselbe Umrechnung, mit der
+            # auch das Barometer den Aufschlag gewichtet.
+            "vergleichswert": monat_bp / 5.0,
+            "kurzwert": "%+.0f Bp im Monat" % monat_bp,
         })
 
     # --- Dasselbe am unteren Ende der Bonitaetsskala
@@ -1041,6 +1126,8 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if ccc_monat < -50 else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": ccc_monat,
+            "vergleichswert": ccc_monat / 5.0,
+            "kurzwert": "%+.0f Bp im Monat" % ccc_monat,
         })
 
     # --- Preis je Million Token: der direkte Effizienzmesswert
@@ -1813,6 +1900,15 @@ NICHT als Beleg, dass westliche Anbieter bereits Umsatz verlieren - siehe den
 Abschnitt zur Uebernahme-Reibung oben. Aussagekraeftig ist allein die
 Veraenderung ueber die Wochen.
 
+ERWARTETE MODELL-VEROEFFENTLICHUNGEN
+Was als Naechstes kommt, entscheidet ueber Ausloeser 3, den Effizienzdurchbruch.
+Ein chinesisches Modell auf Spitzenniveau zu einem Zehntel des Preises
+bestaetigt die These schlagartig; ein westliches Modell, das den
+Qualitaetsvorsprung wieder deutlich ausbaut, schwaecht sie. Wenn du in den
+Schlagzeilen eine dieser Veroeffentlichungen siehst, ist das eine Eilmeldung
+wert - und trag die Guete und den Preis danach in die Modelltabelle nach.
+%s
+
 Faehigkeit und Preis je Million Token - der direkte Effizienzmesswert.
 Nach Faehigkeit sortiert (Qualitaetswert 0-100), die faehigsten zuerst.
 Entscheidend ist nicht der billigste Preis, sondern der Preis bei GLEICHER
@@ -1984,6 +2080,7 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
         kennzahlen_text(konfig),
+        modell_releases_text(konfig),
         ((("\n".join("  Guete %3s  %-24s %-10s %s  %s USD Ausgabe%s"
                     % (m.get("faehigkeit", "?"), m["modell"], m["anbieter"],
                        m.get("land", ""),
@@ -3770,6 +3867,36 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  % (grenze, html_schuetzen(token.get("quelle", "?")),
                     html_schuetzen(token.get("stand", "?"))))
 
+    # ---- Was als Naechstes erwartet wird
+    rel = (konfig.get("modell_releases") or {})
+    if rel.get("erwartet"):
+        t.append("<h2>Erwartete Modell-Veroeffentlichungen</h2>")
+        t.append('<div class="klein" style="margin-bottom:8px">%s</div>'
+                 % html_schuetzen(rel.get("hinweis", "")))
+        t.append("<div class='tabelle'><table><tr><th>Modell</th><th>Anbieter</th>"
+                 "<th>Land</th><th>Erwartet</th><th>Sicherheit</th>"
+                 "<th>Was es bedeuten wuerde</th></tr>")
+        for e in rel["erwartet"]:
+            t.append("<tr%s><td><b>%s</b></td><td>%s</td><td class='klein'>%s</td>"
+                     "<td>%s</td><td class='klein'>%s</td>"
+                     "<td class='klein'>%s</td></tr>"
+                     % (" style='background:rgba(255,160,120,.07)'"
+                        if e.get("land") == "CN" else "",
+                        html_schuetzen(e.get("modell", "?")),
+                        html_schuetzen(e.get("anbieter", "")),
+                        html_schuetzen(e.get("land", "")),
+                        html_schuetzen(e.get("erwartet", "offen")),
+                        html_schuetzen(e.get("sicherheit", "")),
+                        html_schuetzen(e.get("bedeutung", ""))))
+        t.append("</table></div>")
+        t.append('<div class="klein" style="margin-top:8px">Erwartungen aus '
+                 'Berichten und Lecks, keine Zusagen der Anbieter. Quelle: %s, '
+                 'Stand %s. Die Nachrichtensuche verfolgt diese Namen mit &ndash; '
+                 'eine Veroeffentlichung taucht dort auf, sobald sie gemeldet '
+                 'wird.</div>'
+                 % (html_schuetzen(rel.get("quelle", "?")),
+                    html_schuetzen(rel.get("stand", "?"))))
+
     # ---- Tatsaechlicher Verbrauch
     nutzung = (konfig.get("_tokennutzung") or {})
     if nutzung.get("jetzt", {}).get("modelle"):
@@ -3819,6 +3946,39 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  'deshalb stark. Aussagekraeftig ist allein die Veraenderung ueber '
                  'die Wochen, und zwar fuer das preisempfindliche Segment, in dem '
                  'sich ein Wechsel zuerst zeigen wuerde.</div>')
+
+        # ---- Verlauf des Anteils: gemeldete Marken neben eigener Messung
+        ma = marktanteil_auswerten(konfig, nutzung)
+        if ma:
+            t.append("<h3>Verlauf des chinesischen Anteils</h3>")
+            if ma.get("hinweis"):
+                t.append('<div class="klein" style="margin-bottom:8px">%s</div>'
+                         % html_schuetzen(ma["hinweis"]))
+            t.append("<div class='tabelle'><table><tr><th>Zeitraum</th>"
+                     "<th class='z'>Anteil China</th><th>Art</th>"
+                     "<th>Erhebung</th></tr>")
+            for z in ma["zeilen"]:
+                t.append("<tr%s><td>%s</td><td class='z'><b>%s%.1f&nbsp;%%</b></td>"
+                         "<td class='klein'>%s</td><td class='klein'>%s</td></tr>"
+                         % (" style='background:rgba(120,160,255,.07)'"
+                            if z.get("gemessen") else "",
+                            html_schuetzen(z.get("zeitraum", "?")),
+                            "&ge;&nbsp;" if z.get("art", "").startswith("Unter") else "",
+                            z.get("wert") or 0,
+                            html_schuetzen(z.get("art", "")),
+                            html_schuetzen(z.get("erhebung", ""))))
+            t.append("</table></div>")
+            t.append('<div class="klein" style="margin-top:8px"><b>Die beiden '
+                     'Erhebungen sind nicht dieselbe Grundgesamtheit.</b> Die '
+                     'gemeldeten Marken messen den Unternehmensverkehr der '
+                     'Rangliste, die hervorgehobenen Zeilen die eigene Messung '
+                     'ueber die ganze Rangliste einschliesslich Bastel- und '
+                     'Freikontingent-Verkehr. Die eigene Zahl liegt darum '
+                     'systematisch hoeher und ist keine Fortschreibung der '
+                     'gemeldeten Reihe &ndash; die Reihen gehoeren nebeneinander, '
+                     'nicht in eine Kurve. Aussagekraeftig ist die Richtung, '
+                     'nicht die Hoehe. Quelle der Marken: %s. Stand: %s.</div>'
+                     % (html_schuetzen(ma["quelle"]), html_schuetzen(ma["stand"])))
 
     # ---- Regierung
     t.append("<h2>Regierungsvorhaben (Federal Register)</h2>")
@@ -4049,7 +4209,16 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     for ticker in konfig.get("news_ticker", []):
         aufnehmen(yahoo_news(ticker, kennung), "Ticker " + ticker)
     for suche in konfig.get("news_suchen", []):
-        aufnehmen(google_news(suche["query"], kennung), suche["thema"])
+        # Ein Eintrag darf auch blosser Suchtext sein. Frueher riss eine
+        # solche Zeile den ganzen Lauf ab - ein Formfehler in der
+        # Konfiguration darf den Monitor nicht anhalten.
+        if isinstance(suche, str):
+            suche = {"query": suche, "thema": "Sonstiges"}
+        if not isinstance(suche, dict) or not suche.get("query"):
+            fehler.append("Suchbegriff unbrauchbar: %.40r" % (suche,))
+            continue
+        aufnehmen(google_news(suche["query"], kennung),
+                  suche.get("thema") or "Sonstiges")
 
     # Regierung
     regierung = []
@@ -5034,6 +5203,45 @@ def claude_sichern(urteil):
     verbesserung_merken(urteil)
 
 
+def _vorschlag_kern(text):
+    """
+    Reduziert einen Vorschlag auf seinen Kern, damit Umformulierungen als
+    dasselbe erkannt werden.
+
+    claude formuliert denselben Wunsch ueber Tage hinweg jedes Mal etwas anders.
+    Ein Vergleich der ersten Zeichen wuerde daraus acht Eintraege am Tag machen -
+    bei acht Laeufen taeglich waere die Ablage nach einer Woche voller
+    Doppelungen, und die echten alten Vorschlaege fielen hinten heraus.
+    """
+    unten = re.sub(r"[^a-z0-9aeiouss ]", " ", text.lower()
+                   .replace("ae", "a").replace("oe", "o").replace("ue", "u"))
+    # Fuellwoerter tragen nichts zur Unterscheidung bei.
+    fuell = {"der", "die", "das", "und", "als", "aus", "dem", "den", "des", "ein",
+             "eine", "einer", "fuer", "fur", "mit", "von", "vom", "zum", "zur",
+             "im", "in", "auf", "ist", "sind", "wird", "werden", "nicht", "nur",
+             "sich", "auch", "noch", "je", "pro", "statt", "dazu", "damit"}
+    # Wortstaemme grob angleichen, damit "Reihe" und "Quartalsreihe" oder
+    # "Vorratsbestand" und "Vorratsbestaende" zusammenfallen.
+    woerter = set()
+    for w in unten.split():
+        if len(w) > 3 and w not in fuell:
+            woerter.add(w[:11])
+    return woerter
+
+
+def _vorschlag_gleich(a, b, schwelle=0.55):
+    """
+    Zwei Vorschlaege gelten als derselbe, wenn ihre Kernwoerter stark
+    ueberlappen. Ein exakter Vergleich taugt nicht: Dieselbe Bitte lautet
+    einmal "Reihe ueber sechs Quartale" und einmal "Quartalsreihe" - die
+    Schluessel aehneln sich, sind aber nie gleich.
+    """
+    if not a or not b:
+        return False
+    gemeinsam = len(a & b)
+    return gemeinsam / float(min(len(a), len(b))) >= schwelle
+
+
 def verbesserung_merken(urteil):
     """
     Schreibt Claudes Vorschlaege mit, damit der woechentliche Verbesserungslauf
@@ -5041,8 +5249,7 @@ def verbesserung_merken(urteil):
 
     Ohne diese Ablage waeren sie nach dem naechsten Lauf verloren: claude.json
     wird jedes Mal ueberschrieben, und im Bericht steht nur der jeweils letzte
-    Stand. Doppelte Vorschlaege werden nicht erneut aufgenommen - Claude nennt
-    ueber Tage hinweg oft denselben Wunsch.
+    Stand.
     """
     # Die beiden Berichtsteile, aus denen Verbesserungen kommen:
     #   "Was Claude fehlt"  -> datenwunsch: welche Daten fehlen
@@ -5059,39 +5266,50 @@ def verbesserung_merken(urteil):
     verlauf = json_laden(VERBESSERUNG_PFAD, [])
     if not isinstance(verlauf, list):
         verlauf = []
-    bekannt = {(e.get("text") or "")[:120] for e in verlauf}
+    for e in verlauf:
+        if not isinstance(e.get("kern"), list):
+            e["kern"] = sorted(_vorschlag_kern(e.get("text") or ""))
 
     jetzt = datetime.now().isoformat(timespec="seconds")
     neu_dazu = 0
-    for w in wuensche:
-        text = w if isinstance(w, str) else json.dumps(w, ensure_ascii=False)
-        if text[:120] in bekannt:
-            continue
-        verlauf.append({"zeit": jetzt, "art": "datenwunsch", "text": text,
-                        "erledigt": False})
-        bekannt.add(text[:120])
-        neu_dazu += 1
-    if uebersehen and uebersehen[:120] not in bekannt:
-        verlauf.append({"zeit": jetzt, "art": "uebersehen", "text": uebersehen,
-                        "erledigt": False})
-        bekannt.add(uebersehen[:120])
-        neu_dazu += 1
 
+    def aufnehmen(art, text):
+        kern = _vorschlag_kern(text)
+        vorhanden = next((e for e in verlauf
+                          if _vorschlag_gleich(kern, set(e.get("kern") or []))), None)
+        if vorhanden is not None:
+            # Schon bekannt: nur mitzaehlen, wie oft er wiederkommt. Ein Wunsch,
+            # den claude zwanzigmal nennt, wiegt schwerer als einer von gestern.
+            vorhanden["genannt"] = (vorhanden.get("genannt") or 1) + 1
+            vorhanden["zuletzt"] = jetzt
+            return 0
+        verlauf.append({"zeit": jetzt, "zuletzt": jetzt, "art": art, "text": text,
+                        "kern": sorted(kern), "genannt": 1, "erledigt": False})
+        return 1
+
+    for w in wuensche:
+        neu_dazu += aufnehmen("datenwunsch",
+                              w if isinstance(w, str) else json.dumps(w, ensure_ascii=False))
+    if uebersehen:
+        neu_dazu += aufnehmen("uebersehen", uebersehen)
     for u in umstufungen:
         if not isinstance(u, dict):
             continue
-        text = ("Stichwortfilter lag falsch bei: %s -> %s. Grund: %s"
-                % ((u.get("titel") or "?")[:90], u.get("kategorie", "?"),
-                   (u.get("grund") or "")[:200]))
-        if text[:120] in bekannt:
-            continue
-        verlauf.append({"zeit": jetzt, "art": "filterfehler", "text": text,
-                        "erledigt": False})
-        bekannt.add(text[:120])
-        neu_dazu += 1
+        neu_dazu += aufnehmen(
+            "filterfehler",
+            "Stichwortfilter lag falsch bei: %s -> %s. Grund: %s"
+            % ((u.get("titel") or "?")[:90], u.get("kategorie", "?"),
+               (u.get("grund") or "")[:200]))
 
+    # Beim Kuerzen niemals einen offenen Vorschlag wegwerfen - genau die sollen
+    # ja bearbeitet werden. Erledigte duerfen weichen.
+    if len(verlauf) > 300:
+        offen = [e for e in verlauf if not e.get("erledigt")]
+        erledigt = [e for e in verlauf if e.get("erledigt")]
+        verlauf = erledigt[-(max(0, 300 - len(offen))):] + offen
+
+    json_speichern(VERBESSERUNG_PFAD, verlauf)
     if neu_dazu:
-        json_speichern(VERBESSERUNG_PFAD, verlauf[-300:])
         log_schreiben("%d neue Verbesserungsvorschlaege vermerkt" % neu_dazu)
 
 
