@@ -5056,6 +5056,45 @@ def claude_sichern(urteil):
     verbesserung_merken(urteil)
 
 
+def _vorschlag_kern(text):
+    """
+    Reduziert einen Vorschlag auf seinen Kern, damit Umformulierungen als
+    dasselbe erkannt werden.
+
+    claude formuliert denselben Wunsch ueber Tage hinweg jedes Mal etwas anders.
+    Ein Vergleich der ersten Zeichen wuerde daraus acht Eintraege am Tag machen -
+    bei acht Laeufen taeglich waere die Ablage nach einer Woche voller
+    Doppelungen, und die echten alten Vorschlaege fielen hinten heraus.
+    """
+    unten = re.sub(r"[^a-z0-9aeiouss ]", " ", text.lower()
+                   .replace("ae", "a").replace("oe", "o").replace("ue", "u"))
+    # Fuellwoerter tragen nichts zur Unterscheidung bei.
+    fuell = {"der", "die", "das", "und", "als", "aus", "dem", "den", "des", "ein",
+             "eine", "einer", "fuer", "fur", "mit", "von", "vom", "zum", "zur",
+             "im", "in", "auf", "ist", "sind", "wird", "werden", "nicht", "nur",
+             "sich", "auch", "noch", "je", "pro", "statt", "dazu", "damit"}
+    # Wortstaemme grob angleichen, damit "Reihe" und "Quartalsreihe" oder
+    # "Vorratsbestand" und "Vorratsbestaende" zusammenfallen.
+    woerter = set()
+    for w in unten.split():
+        if len(w) > 3 and w not in fuell:
+            woerter.add(w[:11])
+    return woerter
+
+
+def _vorschlag_gleich(a, b, schwelle=0.55):
+    """
+    Zwei Vorschlaege gelten als derselbe, wenn ihre Kernwoerter stark
+    ueberlappen. Ein exakter Vergleich taugt nicht: Dieselbe Bitte lautet
+    einmal "Reihe ueber sechs Quartale" und einmal "Quartalsreihe" - die
+    Schluessel aehneln sich, sind aber nie gleich.
+    """
+    if not a or not b:
+        return False
+    gemeinsam = len(a & b)
+    return gemeinsam / float(min(len(a), len(b))) >= schwelle
+
+
 def verbesserung_merken(urteil):
     """
     Schreibt Claudes Vorschlaege mit, damit der woechentliche Verbesserungslauf
@@ -5063,8 +5102,7 @@ def verbesserung_merken(urteil):
 
     Ohne diese Ablage waeren sie nach dem naechsten Lauf verloren: claude.json
     wird jedes Mal ueberschrieben, und im Bericht steht nur der jeweils letzte
-    Stand. Doppelte Vorschlaege werden nicht erneut aufgenommen - Claude nennt
-    ueber Tage hinweg oft denselben Wunsch.
+    Stand.
     """
     # Die beiden Berichtsteile, aus denen Verbesserungen kommen:
     #   "Was Claude fehlt"  -> datenwunsch: welche Daten fehlen
@@ -5081,39 +5119,50 @@ def verbesserung_merken(urteil):
     verlauf = json_laden(VERBESSERUNG_PFAD, [])
     if not isinstance(verlauf, list):
         verlauf = []
-    bekannt = {(e.get("text") or "")[:120] for e in verlauf}
+    for e in verlauf:
+        if not isinstance(e.get("kern"), list):
+            e["kern"] = sorted(_vorschlag_kern(e.get("text") or ""))
 
     jetzt = datetime.now().isoformat(timespec="seconds")
     neu_dazu = 0
-    for w in wuensche:
-        text = w if isinstance(w, str) else json.dumps(w, ensure_ascii=False)
-        if text[:120] in bekannt:
-            continue
-        verlauf.append({"zeit": jetzt, "art": "datenwunsch", "text": text,
-                        "erledigt": False})
-        bekannt.add(text[:120])
-        neu_dazu += 1
-    if uebersehen and uebersehen[:120] not in bekannt:
-        verlauf.append({"zeit": jetzt, "art": "uebersehen", "text": uebersehen,
-                        "erledigt": False})
-        bekannt.add(uebersehen[:120])
-        neu_dazu += 1
 
+    def aufnehmen(art, text):
+        kern = _vorschlag_kern(text)
+        vorhanden = next((e for e in verlauf
+                          if _vorschlag_gleich(kern, set(e.get("kern") or []))), None)
+        if vorhanden is not None:
+            # Schon bekannt: nur mitzaehlen, wie oft er wiederkommt. Ein Wunsch,
+            # den claude zwanzigmal nennt, wiegt schwerer als einer von gestern.
+            vorhanden["genannt"] = (vorhanden.get("genannt") or 1) + 1
+            vorhanden["zuletzt"] = jetzt
+            return 0
+        verlauf.append({"zeit": jetzt, "zuletzt": jetzt, "art": art, "text": text,
+                        "kern": sorted(kern), "genannt": 1, "erledigt": False})
+        return 1
+
+    for w in wuensche:
+        neu_dazu += aufnehmen("datenwunsch",
+                              w if isinstance(w, str) else json.dumps(w, ensure_ascii=False))
+    if uebersehen:
+        neu_dazu += aufnehmen("uebersehen", uebersehen)
     for u in umstufungen:
         if not isinstance(u, dict):
             continue
-        text = ("Stichwortfilter lag falsch bei: %s -> %s. Grund: %s"
-                % ((u.get("titel") or "?")[:90], u.get("kategorie", "?"),
-                   (u.get("grund") or "")[:200]))
-        if text[:120] in bekannt:
-            continue
-        verlauf.append({"zeit": jetzt, "art": "filterfehler", "text": text,
-                        "erledigt": False})
-        bekannt.add(text[:120])
-        neu_dazu += 1
+        neu_dazu += aufnehmen(
+            "filterfehler",
+            "Stichwortfilter lag falsch bei: %s -> %s. Grund: %s"
+            % ((u.get("titel") or "?")[:90], u.get("kategorie", "?"),
+               (u.get("grund") or "")[:200]))
 
+    # Beim Kuerzen niemals einen offenen Vorschlag wegwerfen - genau die sollen
+    # ja bearbeitet werden. Erledigte duerfen weichen.
+    if len(verlauf) > 300:
+        offen = [e for e in verlauf if not e.get("erledigt")]
+        erledigt = [e for e in verlauf if e.get("erledigt")]
+        verlauf = erledigt[-(max(0, 300 - len(offen))):] + offen
+
+    json_speichern(VERBESSERUNG_PFAD, verlauf)
     if neu_dazu:
-        json_speichern(VERBESSERUNG_PFAD, verlauf[-300:])
         log_schreiben("%d neue Verbesserungsvorschlaege vermerkt" % neu_dazu)
 
 
