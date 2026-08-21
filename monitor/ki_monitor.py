@@ -833,10 +833,16 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
             "einheit": "%-Pkt vs Nasdaq (1 Monat)",
             "erklaerung": "Chinesische Modell- und Softwarefirmen gegen den "
                           "Nasdaq: Alibaba, Tencent, SenseTime, iFlytek, Kingsoft "
-                          "Cloud, Baidu. Das ist der Kern der China-These - "
-                          "Effizienz durch bessere Modelle, nicht durch eigene "
-                          "Fabriken.",
-            "these": "gut" if rs > 2 else ("schlecht" if rs < -2 else "neutral"),
+                          "Cloud, Baidu. <b>Nur zur Kenntnis, nicht als "
+                          "Richtungssignal</b> und ohne Gewicht im Barometer: Ein "
+                          "steigender Kurs misst <b>Nachfrage, nicht Effizienz</b>. "
+                          "Alibabas Staerke im August kam aus wachsendem "
+                          "Cloudgeschaeft und hoeheren eigenen KI-Investitionen, "
+                          "die den Gewinn drueckten &ndash; dieselbe "
+                          "Ausgabendynamik wie im Westen, nur billiger. Die "
+                          "Effizienzseite messen die Preisluecke und der "
+                          "Verbrauchsanteil.",
+            "these": "neutral",
         })
 
     # --- China-KI auf Wochenfrist, damit sie mit den Neoclouds vergleichbar wird
@@ -850,8 +856,9 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
             "erklaerung": "Dieselbe Gruppe auf kurzer Frist. Ein Monatswert kann "
                           "eine starke und eine schwache Woche verdecken - erst "
                           "der Vergleich beider Fristen zeigt, ob sich etwas "
-                          "gerade dreht.",
-            "these": "gut" if rs_w > 2 else ("schlecht" if rs_w < -2 else "neutral"),
+                          "gerade dreht. Ebenfalls nur zur Kenntnis: misst "
+                          "Nachfrage, nicht Effizienz.",
+            "these": "neutral",
         })
 
     # --- China-Gegenprobe ueber die Fertigung
@@ -1014,7 +1021,12 @@ def barometer_rechnen(indikatoren, nachrichten):
         "Bau-Relativstaerke": 1.5,
         "Chips gegen Hyperscaler": 1.2,
         "Konzentrations-Spread": 1.0,
-        "China-KI-Relativstaerke": 1.0,
+        # China-KI-Relativstaerke zaehlt NICHT mehr mit. Der Kurs chinesischer
+        # KI-Firmen misst nicht Effizienz, sondern Nachfrage: Alibabas Staerke im
+        # August kam aus wachsendem Cloudgeschaeft und HOEHEREN eigenen
+        # KI-Investitionen, die den Gewinn druecken - dieselbe Ausgabendynamik wie
+        # im Westen. Als Effizienzbeleg taugen allein die Preisluecke und der
+        # Verbrauchsanteil, und die stehen ohnehin eigens im Bericht.
         "Strom-Relativstaerke": 0.8,
         "Hochzins-Risikoaufschlag": 1.0,
         "Hochzins-Kredite (HYG)": 0.7,
@@ -1029,8 +1041,6 @@ def barometer_rechnen(indikatoren, nachrichten):
         roh = ind.get("veraenderung_monat", ind["wert"])
         if ind["name"] == "Hochzins-Risikoaufschlag":
             roh = -roh / 5.0          # 50 Bp Ausweitung entsprechen 10 Punkten
-        if ind["name"] == "China-KI-Relativstaerke":
-            roh = -roh          # dort ist Staerke gut fuer die These
         # -10 bis +10 Prozentpunkte auf -1..+1 abbilden, Vorzeichen drehen
         normiert = max(-1.0, min(1.0, -roh / 10.0))
         punkte.append((normiert, gewicht))
@@ -1510,7 +1520,10 @@ LAGE HEUTE (%s)
 
 Barometer: %d/100 (%s) - hoch bedeutet, das Umfeld arbeitet fuer die Short-These.
 
-Positionen (Puffer = bis zur Knock-Out-Barriere, bis Stop = bis zur
+Positionen. Die Zeile "IST" ist der tatsaechlich beim Emittenten abgerufene
+Scheinkurs gegen den Einstiegskurs - das ist der Wert, der zaehlt. Die Angaben
+davor sind Naeherungen aus dem Basiswert.
+(Puffer = bis zur Knock-Out-Barriere, bis Stop = bis zur
 Verkaufsmarke, die deutlich frueher greift; Jahresschwankung = annualisierte
 Schwankungsbreite des Basiswerts; Z-Wert = heutige Bewegung in Vielfachen der
 taeglichen Schwankung. Ein Z-Wert ueber +3 oder unter -3 ist ein Ausreisser,
@@ -1563,7 +1576,13 @@ Modelle mit weniger Rechenleistung, wie beim DeepSeek-Moment. Sie lautet NICHT:
 China baut eigene Fabriken.
 
 - "China-KI-Relativstaerke" (Alibaba/Qwen, Tencent/Hunyuan, SenseTime, iFlytek,
-  Kingsoft Cloud, Baidu/Ernie) misst die Modellseite. DAS ist der Kern der These.
+  Kingsoft Cloud, Baidu/Ernie) misst die Modellseite - ABER als Aktienkurs misst
+  sie Nachfrage, nicht Effizienz. Alibabas Staerke im August kam aus wachsendem
+  Cloudgeschaeft und HOEHEREN eigenen KI-Investitionen, die den Gewinn drueckten:
+  dieselbe Ausgabendynamik wie im Westen, nur billiger. Deshalb zaehlt dieser
+  Wert seit dem 21.08.2026 NICHT mehr im Barometer und steht auf neutral. Lies
+  ihn nicht als Effizienzbeleg. Die Effizienzseite messen ausschliesslich die
+  Preisluecke bei gleicher Faehigkeit und der Verbrauchsanteil.
 - "China-Chipfertigung" (SMIC, Cambricon, Hua Hong) misst die Hardwareseite.
   Schwaeche dort widerlegt die These NICHT - sie ist sogar mit ihr vereinbar:
   bessere Modelle auf schwaecheren Chips ist genau die Behauptung.
@@ -1657,14 +1676,24 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         date.today().strftime("%d.%m.%Y"),
         barometer[0], barometer[1],
         zeilen(positionen, 5, lambda p: "  %s (%s): Basiswert %.2f, Tag %+.2f%%, "
-               "Puffer %s, bis Stop %s, Jahresschwankung %s, Z-Wert %s" % (
+               "Puffer %s, bis Stop %s, Jahresschwankung %s, Z-Wert %s\n"
+               "      IST: Schein %s seit Einstieg, Wert %s%s" % (
                    p["name"], p.get("wkn", ""), p["kurs"], p["tag_prozent"],
                    ("%.1f%%" % p["barriere_abstand"]) if p.get("barriere_abstand")
                    is not None else "?",
                    ("%.1f%%" % p["abstand_verlustschwelle"])
                    if p.get("abstand_verlustschwelle") is not None else "?",
                    ("%.0f%%" % p["sigma_jahr"]) if p.get("sigma_jahr") else "?",
-                   ("%+.2f" % p["z_wert"]) if p.get("z_wert") is not None else "?")),
+                   ("%+.2f" % p["z_wert"]) if p.get("z_wert") is not None else "?",
+                   ("%+.2f%%" % p["schein_ist_seit_einstieg"])
+                   if p.get("schein_ist_seit_einstieg") is not None else "unbekannt",
+                   ("%.0f EUR (%+.0f)" % (p["wert_eur"], p.get("gewinn_eur") or 0))
+                   if p.get("wert_eur") else "unbekannt",
+                   ("  ACHTUNG: weicht %+.1f Punkte von der Naeherung "
+                    "Faktor-mal-Basiswert ab - vermutlich Zeitversatz zwischen "
+                    "Scheinkurs und Basiswertkurs; der IST-Wert gilt."
+                    % p["schein_abweichung"])
+                   if abs(p.get("schein_abweichung") or 0) > 1.5 else "")),
         zeilen(indikatoren, 12, lambda i: "  %s: %.2f %s" % (
             i["name"], i["wert"], i["einheit"])),
         zeilen(relevant, 25, lambda n: "  [%s] %s (%s)" % (
@@ -3120,8 +3149,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     # ---- Positionen
     t.append("<h2>Positionen</h2><div class='tabelle'><table><tr><th>Position</th><th>WKN</th>"
              "<th>Verlauf 3 Monate</th><th class='z'>Kurs</th><th class='z'>Tag</th>"
-             "<th class='z'>Schein Tag</th><th class='z'>seit Einstieg</th>"
-             "<th class='z'>bis Stop</th>"
+             "<th class='z'>Schein Tag</th><th class='z'>Schein ist</th>"
+             "<th class='z'>Wert</th><th class='z'>bis Stop</th>"
              "<th class='z'>Puffer</th><th class='z'>Drag/Woche</th></tr>")
     for p in positionen:
         puffer = p.get("barriere_abstand")
@@ -3131,6 +3160,7 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
         t.append("<tr><td>%s</td><td class='klein'>%s</td><td>%s</td>"
                  "<td class='z'>%.2f</td><td class='z %s'>%s</td>"
                  "<td class='z %s'>%s</td><td class='z %s'>%s</td>"
+                 "<td class='z %s'>%s</td>"
                  "<td class='z %s'>%s</td><td class='z %s'>%s</td>"
                  "<td class='z neutral'>%s</td></tr>" % (
                      p["name"], p.get("wkn", ""), sparkline(p.get("verlauf")),
@@ -3138,8 +3168,15 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      klasse_fuer(p["tag_prozent"]), zahl(p["tag_prozent"], 2, "%"),
                      klasse_fuer(p["schein_tag_prozent"], True),
                      zahl(p["schein_tag_prozent"], 2, "%"),
-                     klasse_fuer(p.get("schein_seit_einstieg"), True),
-                     zahl(p.get("schein_seit_einstieg"), 1, "%"),
+                     klasse_fuer(p.get("schein_ist_seit_einstieg"), True),
+                     (zahl(p.get("schein_ist_seit_einstieg"), 1, "%")
+                      if p.get("schein_ist_seit_einstieg") is not None
+                      else zahl(p.get("schein_seit_einstieg"), 1, "%") + "&nbsp;th."),
+                     ("gut" if (p.get("gewinn_eur") or 0) > 0
+                      else "schlecht" if (p.get("gewinn_eur") or 0) < 0 else "neutral"),
+                     ("%.0f&nbsp;&euro; (%s)" % (p["wert_eur"],
+                      zahl(p.get("gewinn_eur"), 0, "&nbsp;&euro;"))
+                      if p.get("wert_eur") else "&ndash;"),
                      ("schlecht" if (p.get("abstand_verlustschwelle") or -99) > -12
                       else "warn" if (p.get("abstand_verlustschwelle") or -99) > -22
                       else "neutral"),
@@ -3147,11 +3184,29 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      pk, ("%.1f%%" % puffer) if puffer is not None else "&ndash;",
                      zahl(p.get("drag_woche_prozent"), 1, "%")))
     t.append("</table></div>")
-    t.append('<div class="klein" style="margin-top:8px">Schein-Werte sind '
-             'Naeherungen (Basiswert-Bewegung mal Faktor, ohne Produktkosten). '
+    # Laufen Ist und Naeherung auseinander, ist das ein Datenhinweis: Schein- und
+    # Basiswertkurs stammen dann aus verschiedenen Momenten. Sichtbar machen,
+    # damit niemand am Abend der Zahlen der falschen Spalte glaubt.
+    schief = [p for p in positionen if abs(p.get("schein_abweichung") or 0) > 1.5]
+    if schief:
+        t.append('<div class="karte warn klein">%s: Der abgerufene Scheinkurs weicht '
+                 'von der Naeherung Faktor&nbsp;mal&nbsp;Basiswert ab. Wahrscheinlich '
+                 'stammen Scheinkurs und Basiswertkurs aus verschiedenen Momenten. '
+                 '<b>Es gilt die Spalte &bdquo;Schein ist&ldquo;</b> &ndash; sie ist '
+                 'der Preis, zu dem tatsaechlich gehandelt wird.</div>'
+                 % ", ".join("%s %+.1f Pkt" % (html_schuetzen(p["name"]),
+                                               p["schein_abweichung"])
+                             for p in schief))
+
+    t.append('<div class="klein" style="margin-top:8px"><b>&bdquo;Schein ist&ldquo; '
+             'ist der tatsaechlich abgerufene Scheinkurs gegen deinen '
+             'Einstiegskurs</b>, nicht die Naeherung Faktor mal Basiswert. Steht '
+             'dort &bdquo;th.&ldquo;, war kein Kurs abrufbar und der Wert ist die '
+             'Naeherung. &bdquo;Schein Tag&ldquo; und &bdquo;Drag&ldquo; bleiben '
+             'Naeherungen. '
              'Die Reset-Barriere wandert taeglich &ndash; Stand laut Konfiguration: '
              '%s. Einstiegskurse in <code>config.json</code> eintragen, damit die '
-             'Spalten "seit Einstieg" und "Drag" rechnen.</div>'
+             'Spalten "Schein ist" und "Drag" rechnen.</div>'
              % ", ".join("%s&nbsp;%s" % (p.get("wkn", ""), p.get("barriere_stand", "?"))
                          for p in positionen))
 
@@ -3600,6 +3655,28 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         ausgewertet["wertverlauf"] = positionswert_verlauf(pos, daten, hole("EURUSD=X"))
         ausgewertet["kurs_quelle"] = pos.get("kurs_quelle")
         ausgewertet["scheinkurs"] = pos.get("kurs_aktuell")
+
+        # Was wirklich in der Position steckt - aus dem abgerufenen Scheinkurs,
+        # nicht aus Faktor mal Basiswert. Beides kann auseinanderlaufen: durch
+        # Spread, Produktkosten, Wechselkurs und dadurch, dass Scheinkurs und
+        # Basiswertkurs aus verschiedenen Momenten stammen. Am Abend der
+        # Nvidia-Zahlen zaehlt der Ist-Wert, nicht die Naeherung.
+        einst_schein = pos.get("einstiegskurs_schein")
+        jetzt_schein = pos.get("kurs_aktuell")
+        if einst_schein and jetzt_schein:
+            ist = ((jetzt_schein / einst_schein) - 1.0) * 100.0
+            ausgewertet["schein_ist_seit_einstieg"] = ist
+            theorie = ausgewertet.get("schein_seit_einstieg")
+            if theorie is not None:
+                ausgewertet["schein_abweichung"] = ist - theorie
+        stueck = pos.get("stueck")
+        einsatz = pos.get("kapital_eur")
+        if stueck and jetzt_schein:
+            wert = stueck * jetzt_schein
+            ausgewertet["wert_eur"] = wert
+            if einsatz:
+                ausgewertet["gewinn_eur"] = wert - einsatz
+
         positionen.append(ausgewertet)
 
     gute_kurse = {k: v for k, v in kurse.items() if not v.get("fehler")}
