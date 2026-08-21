@@ -97,7 +97,7 @@ Die beiden China-Gruppen messen bewusst Verschiedenes: Die Modellseite prüft, o
 chinesische KI durch **Effizienz** aufholt, die Fertigungsseite, ob sie es durch
 **eigene Hardware** tut. Beide können unabhängig voneinander recht haben.
 
-**Zehn abgeleitete Indikatoren**, die einzelne Kurse nicht zeigen:
+**Abgeleitete Indikatoren**, die einzelne Kurse nicht zeigen:
 
 | Indikator | Wozu |
 |---|---|
@@ -112,6 +112,8 @@ chinesische KI durch **Effizienz** aufholt, die Fertigungsseite, ob sie es durch
 | Kreditrisiko-Aufschlag | Wie weit Hochzins hinter erster Bonität zurückbleibt. **Steigt er, wird Refinanzierung teuer** — das stützt die These. Als Aufschlag gerechnet (`LQD − HYG`), damit Name und Richtung zusammenpassen |
 | Speicherpreise | Kostenseite der Capex-Rendite |
 | Preis je Million Token | Der **direkte** Effizienzmesswert. Fallende Preise entwerten Rechenleistung und stützen die These — alles andere misst Effizienz nur über Aktienkurse |
+| Nvidia Vorratsreichweite | Vorräte geteilt durch Wareneinsatz, in Tagen. **Steigt sie, wächst der Bestand schneller als der Abverkauf** — daraus wird eine Abschreibung. Zweideutig für sich allein: ein Aufbau vor einem verkauften Hochlauf sieht genauso aus |
+| Vertiv erhaltene Anzahlungen | Vertragsverbindlichkeiten aus dem 10-Q. Der beste Ersatz für den Auftragseingang, seit Vertiv den nicht mehr veröffentlicht — **fällt der Posten, versiegt der Zulauf** |
 
 ### Feste Alarmschwellen
 
@@ -152,7 +154,10 @@ Short-These.
   GPU-Mietpreise, Speicher-Vertragspreise, Netzanschluss-Warteschlange,
   Schulden der KI-Bauherren, Auftragseingang der Ausrüster)
 - Federal Register — Regierungsvorhaben zu Exportkontrollen und Chips
-- SEC EDGAR — 8-K-Pflichtmeldungen von Nvidia, Vertiv, CoreWeave
+- SEC EDGAR — 8-K-Pflichtmeldungen von Nvidia, Vertiv, CoreWeave (dieselbe Quelle
+  liefert über `data.sec.gov/api/xbrl` auch die Bilanzposten für die beiden
+  letzten Indikatoren — einmal am Tag, weil Quartalszahlen sich nicht öfter
+  ändern; zwischengespeichert in `bilanzreihen.json`)
 - Blogs von OpenAI, DeepMind, HuggingFace, DataCenterDynamics, SemiAnalysis
   (veröffentlicht den GPU-Mietpreisindex), Utility Dive (Netzanschlüsse und
   Versorger) und The Register
@@ -377,6 +382,7 @@ die Börse Frankfurt und finanzen.net mit 403. Schlägt der Abruf fehl, greifen
 | `ki_monitor.py` | das Skript |
 | `config.json` | Positionen, Schwellen, Ticker, Suchbegriffe, Termine |
 | `state.json` | letzter Lauf, gemeldete Alarme, letztes Barometer |
+| `bilanzreihen.json` | Vorräte, Wareneinsatz und Anzahlungen je Quartal aus SEC-XBRL |
 | `bericht.html` | der zuletzt erzeugte Bericht |
 | `monitor.log` | Verlaufsprotokoll |
 | `launchd.out.log` / `launchd.err.log` | Ausgaben der launchd-Jobs |

@@ -633,6 +633,122 @@ def fred_reihe(kennung, reihe="BAMLH0A0HYM2", tage=140):
     return werte
 
 
+BILANZ_PFAD = os.path.join(BASIS, "bilanzreihen.json")
+
+# Bilanzposten, die als Quartalsreihe direkt aus den XBRL-Daten der SEC kommen.
+# "punkt" ist ein Stichtagswert, "zeitraum" eine Quartalsgroesse.
+BILANZ_KONZEPTE = (
+    ("nvidia_vorraete", "1045810", "InventoryNet", "punkt"),
+    ("nvidia_wareneinsatz", "1045810", "CostOfRevenue", "zeitraum"),
+    ("vertiv_vertragsverbindlichkeiten", "1674101",
+     "ContractWithCustomerLiabilityCurrent", "punkt"),
+)
+
+
+def sec_konzept_reihe(cik, konzept, kennung, art="punkt"):
+    """
+    Holt einen einzelnen Bilanzposten als Quartalsreihe von data.sec.gov.
+
+    Die Schnittstelle ist offen und verlangt nur die Kennung mit Kontaktadresse,
+    die auch die Pflichtmeldungen schon benutzen. Sie liefert genau das, was im
+    10-Q ausgezeichnet steht - keine Presseaufbereitung, keine Schaetzung.
+
+    Derselbe Stichtag taucht mehrfach auf, weil jedes Folgequartal die
+    Vergleichszahl mitliefert. Es gilt die zuletzt eingereichte Fassung, sonst
+    stuende eine spaeter berichtigte Zahl neben der urspruenglichen.
+    """
+    url = ("https://data.sec.gov/api/xbrl/companyconcept/CIK%010d/us-gaap/%s.json"
+           % (int(cik), konzept))
+    try:
+        roh = abrufen(url, kennung, versuche=2)
+        daten = json.loads(roh.decode("utf-8", "ignore"))
+    except (IOError, ValueError):
+        return []
+
+    posten = (daten.get("units") or {}).get("USD") or []
+    je_stichtag = {}
+    for e in posten:
+        ende = e.get("end")
+        wert = e.get("val")
+        if not ende or wert is None:
+            continue
+        tage = None
+        if e.get("start"):
+            try:
+                tage = (date.fromisoformat(ende) - date.fromisoformat(e["start"])).days
+            except ValueError:
+                continue
+        if art == "zeitraum":
+            # Nur Quartale. Halbjahres- und Jahressummen stehen in derselben
+            # Liste und wuerden die Reihe verdreifachen.
+            if tage is None or not 80 <= tage <= 100:
+                continue
+        elif tage is not None:
+            continue
+        vorher = je_stichtag.get(ende)
+        if vorher is None or (e.get("filed") or "") >= vorher[1]:
+            je_stichtag[ende] = ({"ende": ende, "wert": float(wert), "tage": tage},
+                                 e.get("filed") or "")
+    return [je_stichtag[k][0] for k in sorted(je_stichtag)]
+
+
+def bilanzreihen_holen(kennung):
+    """
+    Sammelt die Bilanzposten, die der Kursverlauf nicht zeigt: Nvidias Vorraete
+    und Vertivs erhaltene Anzahlungen.
+
+    Quartalszahlen aendern sich hoechstens alle drei Monate, der Monitor laeuft
+    alle zehn Minuten. Deshalb wird hoechstens einmal am Tag abgerufen und der
+    letzte Stand sonst aus der Datei genommen. Schlaegt ein Abruf fehl, bleibt
+    die alte Reihe stehen - eine unvollstaendige Reihe waere schlechter als eine
+    einen Tag alte.
+    """
+    bestand = json_laden(BILANZ_PFAD, {})
+    if not isinstance(bestand, dict):
+        bestand = {}
+    heute = date.today().isoformat()
+    if bestand.get("abgerufen") == heute:
+        return bestand
+
+    neu = dict(bestand)
+    geholt = 0
+    for name, cik, konzept, art in BILANZ_KONZEPTE:
+        reihe = sec_konzept_reihe(cik, konzept, kennung, art)
+        if reihe:
+            neu[name] = reihe[-14:]
+            geholt += 1
+    if not geholt:
+        return bestand or None
+    neu["abgerufen"] = heute
+    json_speichern(BILANZ_PFAD, neu)
+    return neu
+
+
+def vorratsreichweite(bilanz):
+    """
+    Rechnet Nvidias Vorraete in Tage Wareneinsatz um.
+
+    Die blosse Milliardenzahl waechst mit dem Unternehmen mit und sagt daher
+    nichts. Die Reichweite setzt sie ins Verhaeltnis zum tatsaechlichen
+    Abverkauf und ist damit ueber die Quartale vergleichbar.
+
+    Das vierte Quartal fehlt in der Reihe: Der Wareneinsatz wird dafuer nur im
+    Jahresabschluss als Jahressumme ausgewiesen, nicht als Quartalswert. Der
+    Vergleich springt dort also ueber zwei Quartale - deshalb steht im Bericht
+    das Vergleichsdatum und nicht das Wort Vorquartal.
+    """
+    vorraete = {e["ende"]: e["wert"] for e in (bilanz.get("nvidia_vorraete") or [])}
+    reihe = []
+    for e in (bilanz.get("nvidia_wareneinsatz") or []):
+        bestand = vorraete.get(e["ende"])
+        if not bestand or not e["wert"]:
+            continue
+        reihe.append({"ende": e["ende"],
+                      "tage": bestand / e["wert"] * (e["tage"] or 91),
+                      "vorraete_mrd": bestand / 1e9})
+    return reihe
+
+
 def position_auswerten(position, kurs):
     faktor = position.get("faktor", -2)
     ergebnis = dict(position)
@@ -952,6 +1068,22 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                           else "schlecht" if j["luecke"] < 2 else "neutral"),
                 "nachkomma": 1,
             })
+        ind.append({
+            "name": "Preis je Million Token",
+            "wert": j["schnitt_ausgabe"],
+            "einheit": ("USD Ausgabe, Schnitt der Spitzengruppe (%d Modelle)%s"
+                        % (j["modelle"],
+                           ", %+.1f%% seit %s" % (v, token["vergleich"])
+                           if v is not None else "")),
+            "erklaerung": "Was ein Modell der Spitzengruppe je Million ausgegebener "
+                          "Token kostet. <b>Fallende Preise entwerten "
+                          "Rechenleistung</b> und stuetzen damit die These - das ist "
+                          "der einzige direkte Messwert fuer die Effizienzseite. "
+                          "Guenstigstes Modell der Liste: " + j["guenstigstes"],
+            "these": ("gut" if (v is not None and v < -5)
+                      else "schlecht" if (v is not None and v > 5) else "neutral"),
+            "nachkomma": 2,
+        })
 
     # --- Wird die Preisluecke auch genutzt?
     nutzung = zusatz.get("tokennutzung") if zusatz else None
@@ -977,22 +1109,6 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if (v is not None and v < -1) else "neutral"),
             "nachkomma": 1,
         })
-        ind.append({
-            "name": "Preis je Million Token",
-            "wert": j["schnitt_ausgabe"],
-            "einheit": ("USD Ausgabe, Schnitt der Spitzengruppe (%d Modelle)%s"
-                        % (j["modelle"],
-                           ", %+.1f%% seit %s" % (v, token["vergleich"])
-                           if v is not None else "")),
-            "erklaerung": "Was ein Modell der Spitzengruppe je Million ausgegebener "
-                          "Token kostet. <b>Fallende Preise entwerten "
-                          "Rechenleistung</b> und stuetzen damit die These - das ist "
-                          "der einzige direkte Messwert fuer die Effizienzseite. "
-                          "Guenstigstes Modell der Liste: " + j["guenstigstes"],
-            "these": ("gut" if (v is not None and v < -5)
-                      else "schlecht" if (v is not None and v > 5) else "neutral"),
-            "nachkomma": 2,
-        })
 
     # --- Speicherpreise als Kostenindikator
     mu = wert("MU", "monat_prozent")
@@ -1006,6 +1122,64 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                           "er weiter, druecken die Kosten die Capex-Rendite.",
             "these": "neutral",
         })
+
+    # --- Bilanzposten: was die Quartalsberichte zeigen und der Kurs nicht
+    bilanz = zusatz.get("bilanzreihen") if zusatz else None
+    if bilanz:
+        reichweite = vorratsreichweite(bilanz)
+        if len(reichweite) >= 2:
+            jetzt_r, vorher_r = reichweite[-1], reichweite[-2]
+            delta = jetzt_r["tage"] - vorher_r["tage"]
+            ind.append({
+                "name": "Nvidia Vorratsreichweite",
+                "wert": jetzt_r["tage"],
+                "einheit": ("Tage Wareneinsatz (%.1f Mrd. USD Vorraete, "
+                            "%+.0f Tage seit %s)"
+                            % (jetzt_r["vorraete_mrd"], delta, vorher_r["ende"])),
+                "erklaerung": "Wie lange Nvidia braucht, um die eigenen Vorraete "
+                              "abzuverkaufen - Bilanzwert geteilt durch "
+                              "Wareneinsatz, direkt aus dem 10-Q. <b>Steigt die "
+                              "Reichweite, waechst der Bestand schneller als der "
+                              "Abverkauf</b>, und genau daraus wird eine "
+                              "Abschreibung. <b>Achtung:</b> ein Aufbau vor einem "
+                              "bereits verkauften Hochlauf sieht genauso aus. "
+                              "Hart wird das Signal erst, wenn die Reichweite "
+                              "steigt UND die Umsatzprognose verfehlt wird - "
+                              "ab dann zaehlt es fuer die These.",
+                "these": ("gut" if delta > 5 else "schlecht" if delta < -5
+                          else "neutral"),
+                "nachkomma": 0,
+                "vergleichswert": delta,
+                "kurzwert": "%.0f Tage, %+.0f" % (jetzt_r["tage"], delta),
+            })
+
+        anzahlungen = bilanz.get("vertiv_vertragsverbindlichkeiten") or []
+        if len(anzahlungen) >= 2 and anzahlungen[-2]["wert"]:
+            jetzt_a, vorher_a = anzahlungen[-1], anzahlungen[-2]
+            wandel = (jetzt_a["wert"] / vorher_a["wert"] - 1) * 100
+            ind.append({
+                "name": "Vertiv erhaltene Anzahlungen",
+                "wert": jetzt_a["wert"] / 1e9,
+                "einheit": ("Mrd. USD Vertragsverbindlichkeiten (%+.0f%% seit %s)"
+                            % (wandel, vorher_a["ende"])),
+                "erklaerung": "Was Kunden bereits gezahlt haben, ohne die Ware zu "
+                              "haben - der beste verbliebene Ersatz fuer den "
+                              "Auftragseingang, seit Vertiv den nicht mehr "
+                              "veroeffentlicht. Anders als der Umsatz laeuft er "
+                              "nicht nach. <b>Faellt der Posten gegenueber dem "
+                              "Vorquartal, versiegt der Zulauf</b> - das ist das "
+                              "frueheste harte Signal fuer die Vertiv-Position. "
+                              "<b>Vorbehalt:</b> nur der kurzfristige Teil, und "
+                              "Zukaeufe bringen fremde Bestaende mit, die wie "
+                              "eigenes Wachstum aussehen.",
+                "these": ("gut" if wandel < -15 else "schlecht" if wandel > 15
+                          else "neutral"),
+                "nachkomma": 2,
+                "vergleichswert": wandel,
+                "kurzwert": "%s Mrd. USD, %+.0f%%"
+                            % (("%.2f" % (jetzt_a["wert"] / 1e9)).replace(".", ","),
+                               wandel),
+            })
 
     return ind
 
@@ -1123,12 +1297,21 @@ def zusammenfassung_bauen(positionen, indikatoren, barometer, nachrichten,
     # --- 2. Was treibt das Barometer
     dafuer = [i for i in indikatoren if i["these"] == "gut"]
     dagegen = [i for i in indikatoren if i["these"] == "schlecht"]
-    dagegen.sort(key=lambda i: -abs(i["wert"]))
-    dafuer.sort(key=lambda i: -abs(i["wert"]))
+    # Nach Groesse ordnen und benennen. Indikatoren, deren Wert ein Stand in
+    # eigener Einheit ist statt einer Veraenderung in Prozent, koennen dafuer
+    # eine vergleichbare Zahl und einen lesbaren Text mitgeben - sonst raenge
+    # sich eine Milliardensumme allein wegen ihrer Groesse nach vorn.
+    def sortwert(i):
+        gross = i.get("vergleichswert")
+        return abs(gross if gross is not None else i["wert"])
+
+    dagegen.sort(key=lambda i: -sortwert(i))
+    dafuer.sort(key=lambda i: -sortwert(i))
 
     teile = []
     def aufzaehlen(liste):
-        return " und ".join("<b>%s</b> (%s)" % (i["name"], _zahl_de(i["wert"], 1))
+        return " und ".join("<b>%s</b> (%s)"
+                            % (i["name"], i.get("kurzwert") or _zahl_de(i["wert"], 1))
                             for i in liste)
 
     if dagegen:
@@ -1789,7 +1972,10 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
                     "Scheinkurs und Basiswertkurs; der IST-Wert gilt."
                     % p["schein_abweichung"])
                    if abs(p.get("schein_abweichung") or 0) > 1.5 else "")),
-        zeilen(indikatoren, 12, lambda i: "  %s: %.2f %s" % (
+        # Alle Indikatoren, nicht die ersten zwoelf: Die Liste ist auf achtzehn
+        # gewachsen, und abgeschnitten wurden ausgerechnet die Effizienzseite und
+        # die Bilanzposten - also das, was der Kursteil gerade nicht zeigt.
+        zeilen(indikatoren, 40, lambda i: "  %s: %.2f %s" % (
             i["name"], i["wert"], i["einheit"])),
         zeilen(relevant, 25, lambda n: "  [%s] %s (%s)" % (
             "DOPPELDEUTIG" if n["kategorie"] == "doppeldeutig"
@@ -3812,6 +3998,14 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         zusatz["tokennutzung"] = nutzung
     else:
         fehler.append("Nutzungsanteil (OpenRouter-Rangliste) nicht auswertbar")
+
+    # Quartalszahlen aus den Pflichtmeldungen. Die Kurse zeigen, was der Markt
+    # erwartet; diese Posten zeigen, was in den Buechern steht.
+    bilanz = bilanzreihen_holen(kennung)
+    if bilanz:
+        zusatz["bilanzreihen"] = bilanz
+    else:
+        fehler.append("Bilanzreihen (SEC XBRL) nicht abrufbar")
 
     reihe_ccc = fred_reihe(kennung, reihe="BAMLH0A3HYC")
     if len(reihe_ccc) > 25:

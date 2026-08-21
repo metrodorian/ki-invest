@@ -1,0 +1,4 @@
+# Laufzeitdaten dieses Ordners. Die uebrigen Ausnahmen stehen in der
+# .gitignore des Wurzelverzeichnisses; hier steht nur, was seither
+# dazugekommen ist.
+bilanzreihen.json

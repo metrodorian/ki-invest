@@ -521,7 +521,22 @@
       "bruttomarge_gaap_prozent": 74.9,
       "betriebsaufwand_mrd": 8.3,
       "einkaufsverpflichtungen_mrd": 145.0,
-      "worauf_achten": "Nicht nur Umsatz und Gewinn. Die Bruttomarge zeigt nachlassende Preissetzungsmacht ein bis zwei Quartale frueher als der Umsatz - das Unternehmen fuehrt 75,0 Prozent, jede Zahl darunter ohne erklaerende Sonderbelastung ist ein Warnzeichen FUER die These. Die Einkaufsverpflichtungen von zuletzt ueber 145 Milliarden zeigen, welche Nachfrage Nvidia selbst unterstellt: Werden sie abgeschrieben oder gekuerzt, hat das Unternehmen die eigene Prognose aufgegeben. Eine Abschreibung auf Vorraete waere das deutlichste Einzelsignal ueberhaupt."
+      "worauf_achten": "Nicht nur Umsatz und Gewinn. Die Bruttomarge zeigt nachlassende Preissetzungsmacht ein bis zwei Quartale frueher als der Umsatz - das Unternehmen fuehrt 75,0 Prozent, jede Zahl darunter ohne erklaerende Sonderbelastung ist ein Warnzeichen FUER die These. Die Einkaufsverpflichtungen von zuletzt ueber 145 Milliarden zeigen, welche Nachfrage Nvidia selbst unterstellt: Werden sie abgeschrieben oder gekuerzt, hat das Unternehmen die eigene Prognose aufgegeben. Eine Abschreibung auf Vorraete waere das deutlichste Einzelsignal ueberhaupt.",
+      "vorratsreichweite": {
+        "bezeichnung": "Vorraete in Tagen Wareneinsatz",
+        "quelle": "SEC XBRL, us-gaap:InventoryNet und us-gaap:CostOfRevenue, CIK 1045810",
+        "automatisch": true,
+        "hinweis": "Wird bei jedem Lauf selbst geholt und steht als Indikator 'Nvidia Vorratsreichweite' im Bericht. Die Einkaufsverpflichtungen liessen sich NICHT als Reihe holen: Nvidia zeichnet sie seit dem Quartal zum 27.07.2025 nicht mehr einheitlich aus. Die Vorraete sind der belastbare Ersatz, weil eine Abschreibung dort zuerst sichtbar wird.",
+        "reihe_tage": {
+          "2024-07-28": 80.5,
+          "2024-10-27": 77.2,
+          "2025-04-27": 58.6,
+          "2025-07-27": 104.5,
+          "2025-10-26": 117.5,
+          "2026-04-26": 113.5
+        },
+        "hinweis_luecke": "Die Quartale zum Januar fehlen, weil der Wareneinsatz dafuer nur als Jahressumme im 10-K steht."
+      }
     },
     "hyperscaler_capex": {
       "bezeichnung": "Investitionen der vier grossen Cloud-Anbieter",
@@ -606,7 +621,22 @@
         "freier_mittelzufluss_mio": 2500
       },
       "naechster_termin": "2026-10-28",
-      "worauf_achten": "Kommt die Zahl zurueck oder bleibt sie weg? Bleibt sie weg, ist das ein Signal fuer sich. Kommt sie zurueck: Book-to-Bill unter 1 bedeutet, der Auftragsbestand schrumpft - das frueheste harte Signal fuer die These."
+      "worauf_achten": "Kommt die Zahl zurueck oder bleibt sie weg? Bleibt sie weg, ist das ein Signal fuer sich. Kommt sie zurueck: Book-to-Bill unter 1 bedeutet, der Auftragsbestand schrumpft - das frueheste harte Signal fuer die These.",
+      "ersatzindikator": {
+        "bezeichnung": "Erhaltene Anzahlungen (Vertragsverbindlichkeiten, kurzfristig)",
+        "quelle": "SEC XBRL, us-gaap:ContractWithCustomerLiabilityCurrent, CIK 1674101",
+        "automatisch": true,
+        "hinweis": "Wird bei jedem Lauf selbst aus dem 10-Q geholt und steht als Indikator 'Vertiv erhaltene Anzahlungen' im Bericht. Solange der Auftragseingang nicht veroeffentlicht wird, ist das der beste verbleibende Ersatz: Kunden haben gezahlt, ohne die Ware zu haben. Faellt der Posten gegenueber dem Vorquartal, versiegt der Zulauf. Vorbehalt: nur der kurzfristige Teil (der langfristige lag zuletzt bei 0,12 Mrd.), und Zukaeufe bringen fremde Bestaende mit.",
+        "reihe_mrd": {
+          "2025-03-31": 1.095,
+          "2025-06-30": 1.257,
+          "2025-09-30": 1.132,
+          "2025-12-31": 1.815,
+          "2026-03-31": 2.462,
+          "2026-06-30": 3.634
+        },
+        "befund": "Der Posten hat sich binnen zwei Quartalen verdoppelt. Das spricht klar GEGEN die These: Kunden zahlen weiter im Voraus. Ein Rueckgang waere das erste harte Gegensignal, das der Umsatz erst zwei bis drei Quartale spaeter zeigen wuerde."
+      }
     },
     "uebernahme_reibung": {
       "bezeichnung": "Reibung zwischen Preisvorteil und tatsaechlichem Wechsel",
