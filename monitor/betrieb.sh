@@ -21,8 +21,8 @@
 #   probealarm            Meldekette testen (Lampe blinkt!)
 #   probealarm-aus        laufenden Alarm abstellen
 #   pruefen               Konfiguration auf Vollstaendigkeit pruefen
-#   verbesserung-zeigen   was der Sonntagslauf vorbereitet hat
-#   verbesserung-annehmen dessen Stand pushen und in den Betrieb uebernehmen
+#   verbesserung-zeigen   was der Sonntagslauf auf dem Zweig "test" vorbereitet hat
+#   aktualisieren         den Stand von main in den Betrieb holen
 #
 # Rollen: In config.lokal.json steht, wofuer der Rechner da ist.
 #   rolle = "betrieb"       ueberwacht, erzeugt Berichte, schickt Alarme (der Pi)
@@ -178,34 +178,50 @@ probealarm)
 
 verbesserung-zeigen)
     ARBEIT="${KI_ARBEIT:-/home/Nutzer/ki-invest-arbeit}"
+    ZWEIG="${KI_ZWEIG:-test}"
     [ -d "$ARBEIT/.git" ] || { echo "Keine Arbeitskopie unter $ARBEIT."; exit 1; }
     cd "$ARBEIT" || exit 1
-    echo "=== Was der Verbesserungslauf vorbereitet hat ==="
-    git log --oneline origin/main..HEAD 2>/dev/null || echo "(nichts Offenes)"
+    git fetch --quiet origin 2>/dev/null
+    echo "=== Was auf dem Zweig '$ZWEIG' liegt und noch nicht in main ist ==="
+    git log --oneline "origin/main..origin/$ZWEIG" 2>/dev/null || echo "(nichts)"
     echo
-    git diff --stat origin/main..HEAD 2>/dev/null
+    git diff --stat "origin/main..origin/$ZWEIG" 2>/dev/null
     echo
-    if [ -f monitor/VERBESSERUNG.md ]; then
-        echo "=== VERBESSERUNG.md ==="; cat monitor/VERBESSERUNG.md
-    elif [ -f VERBESSERUNG.md ]; then
-        echo "=== VERBESSERUNG.md ==="; cat VERBESSERUNG.md
-    fi
+    echo "Vergleich: https://github.com/metrodorian/ki-invest/compare/main...$ZWEIG"
+    echo
+    for datei in monitor/VERBESSERUNG.md VERBESSERUNG.md; do
+        if git show "origin/$ZWEIG:$datei" > /dev/null 2>&1; then
+            echo "=== VERBESSERUNG.md ==="
+            git show "origin/$ZWEIG:$datei"
+            break
+        fi
+    done
     ;;
 
-verbesserung-annehmen)
-    nur_im_betrieb verbesserung-annehmen || exit 1
+aktualisieren)
+    # Holt den zusammengefuehrten Stand von main in den Betrieb. Erst nachdem
+    # ein Mensch den Testzweig durchgesehen und zusammengefuehrt hat - der
+    # Verbesserungslauf selbst kommt an main nicht heran.
+    nur_im_betrieb aktualisieren || exit 1
     ARBEIT="${KI_ARBEIT:-/home/Nutzer/ki-invest-arbeit}"
-    [ -d "$ARBEIT/.git" ] || { echo "Keine Arbeitskopie unter $ARBEIT."; exit 1; }
+    if [ ! -d "$ARBEIT/.git" ]; then
+        git clone --quiet "${KI_REPO:-git@github.com:metrodorian/ki-invest.git}" \
+            "$ARBEIT" || { echo "Klonen fehlgeschlagen."; exit 1; }
+    fi
     cd "$ARBEIT" || exit 1
-    if [ -z "$(git log --oneline origin/main..HEAD 2>/dev/null)" ]; then
-        echo "Nichts anzunehmen."; exit 0
+    git fetch --quiet origin || { echo "Fetch fehlgeschlagen."; exit 1; }
+    git checkout --quiet -B main origin/main || { echo "main nicht auszuchecken."; exit 1; }
+    STAND=$(git rev-parse --short HEAD)
+
+    # Gleicht der Betrieb schon? Dann nichts tun.
+    if cmp -s "$ARBEIT/monitor/ki_monitor.py" "$HIER/ki_monitor.py" \
+       && cmp -s "$ARBEIT/monitor/config.json" "$HIER/config.json"; then
+        echo "Betrieb ist bereits auf dem Stand von main ($STAND)."
+        exit 0
     fi
 
-    echo "Pushe ..."
-    git push origin HEAD || { echo "Push fehlgeschlagen."; exit 1; }
-
-    # Sicherung, damit ein Fehler in einem Griff rueckgaengig ist.
-    SICHERUNG="$HIER/.vor-verbesserung"
+    echo "Aktualisiere auf main ($STAND) ..."
+    SICHERUNG="$HIER/.vor-aktualisierung"
     rm -rf "$SICHERUNG"; mkdir -p "$SICHERUNG"
     cp "$HIER"/*.py "$HIER"/*.sh "$HIER/config.json" "$SICHERUNG/" 2>/dev/null || true
 
@@ -215,12 +231,12 @@ verbesserung-annehmen)
 
     echo "Pruefe im Betrieb ..."
     if timeout 900 "$PYTHON" "$HIER/ki_monitor.py" --web --ohne-claude > /dev/null 2>&1; then
-        "$0" alles-neu --lokal
-        echo "Uebernommen und Dienste neu gestartet."
+        "$HIER/betrieb.sh" alles-neu --lokal
+        echo "Auf $STAND aktualisiert und Dienste neu gestartet."
     else
         cp "$SICHERUNG"/* "$HIER/" 2>/dev/null
-        "$0" alles-neu --lokal
-        echo "FEHLGESCHLAGEN - alter Stand wiederhergestellt. Der Commit ist aber gepusht."
+        "$HIER/betrieb.sh" alles-neu --lokal
+        echo "FEHLGESCHLAGEN - alter Stand wiederhergestellt. main bleibt auf $STAND."
         exit 1
     fi
     ;;

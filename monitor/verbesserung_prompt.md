@@ -66,6 +66,19 @@ scheitert, und markiere ihn als erledigt. Ein begründet verworfener Vorschlag
 ist ein gutes Ergebnis — **niemand erwartet, dass du etwas baust.** Wenn diese
 Woche nichts Gutes dabei ist, ändere nichts.
 
+## Fehler, die du findest, behebst du
+
+Die vier Bedingungen oben gelten für **neue Fähigkeiten**. Für Fehler im
+bestehenden Code gilt das Gegenteil: Findest du einen und kannst du ihn
+belegen, behebe ihn — auch wenn niemand ihn vorgeschlagen hat und auch wenn er
+klein ist. Ein Fehler ist belegt, wenn du ihn benennen kannst („Zeile X schneidet
+die Liste bei zwölf ab, sie hat achtzehn Einträge") und die Behebung durch einen
+Lauf bestätigt wird.
+
+Lass einen Fehler nur dann stehen, wenn die Behebung selbst riskant wäre — etwa
+weil sie das Verhalten vieler Stellen ändert. Dann gehört er unter
+„Aufgefallen", mit dem Satz, warum du ihn liegen lässt.
+
 ## Was du auf keinen Fall anfassen darfst
 
 - **`config.lokal.json`** und alles darin — Zugangsdaten, Hue, Telegram, Mail,
@@ -86,6 +99,10 @@ gefahrlos arbeiten, aber nicht schludern.
 
 1. **Lies zuerst** `verbesserungen.json`, dann `README.md`, dann die Stellen in
    `ki_monitor.py`, die du ändern willst. Das Skript ist lang; arbeite gezielt.
+   Beachte: `daten.json`, `claude.json` und die Verlaufsdateien sind eine
+   **Momentaufnahme vom Beginn deines Laufs**, hereinkopiert aus dem Betrieb.
+   Ist eine davon leer oder alt, schließe daraus nichts über den Betrieb —
+   prüfe es, bevor du es als Feststellung aufschreibst.
 2. **Schreib wie der bestehende Code.** Deutsche Bezeichner, deutsche
    Kommentare ohne Umlaute im Quelltext, Kommentare erklären *warum*, nicht
    *was*. Sieh dir die Nachbarschaft an und füge dich ein.
@@ -114,10 +131,32 @@ Schreib eine Datei `VERBESSERUNG.md` in den Projektordner mit:
 Trage außerdem in `verbesserungen.json` bei jedem behandelten Eintrag
 `"erledigt": true` ein und ergänze `"ergebnis"` mit einem kurzen Satz.
 
-Committe deine Änderungen mit einer aussagekräftigen Nachricht in deutscher
-Sprache: erste Zeile knapp, dann eine Leerzeile, dann was sich fachlich ändert
-und warum. **Keine Co-Authored-By-Zeile.** Push nicht selbst — das übernimmt
-das aufrufende Skript, nachdem es deine Arbeit geprüft hat.
+## Committen
+
+Du arbeitest auf dem Zweig `test`, niemals auf `main` — der ist geschützt. Push
+nicht selbst; das aufrufende Skript pusht den Zweig, nachdem es deine Arbeit
+geprüft hat. Ein Mensch sieht sich den Vergleich auf GitHub an und führt ihn
+zusammen.
+
+**Die Commit-Nachricht ist der Text, an dem später jemand entscheidet, ob er
+deine Arbeit übernimmt.** Schreib sie entsprechend ausführlich, in deutscher
+Sprache:
+
+- Erste Zeile: knapp, was sich ändert. Keine Wiederholung des Dateinamens.
+- Leerzeile, dann für **jede** inhaltliche Änderung ein eigener Absatz mit:
+  - **was** du geändert hast und in welcher Funktion,
+  - **warum** — welches Problem oder welcher Vorschlag dahintersteht,
+  - **woher die Daten kommen**, wenn du eine Quelle anzapfst: genaue Adresse,
+    Feldname, Kennung, und dass du sie abgerufen und die Werte bestätigt hast,
+  - **was ein Leser im Bericht künftig sieht**, mit den heutigen Zahlen,
+  - **welchen Vorbehalt** die Zahl hat, falls einer besteht.
+- Bei behobenen Fehlern: was schiefging, unter welchen Umständen, und woran du
+  erkannt hast, dass es jetzt stimmt.
+
+Lieber zu ausführlich als zu knapp. Niemand liest den Code so genau wie deine
+Begründung. **Keine Co-Authored-By-Zeile.**
+
+Mehrere unabhängige Änderungen gehören in mehrere Commits, nicht in einen.
 
 ## Zum Schluss
 

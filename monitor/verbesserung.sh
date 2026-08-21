@@ -3,12 +3,14 @@
 # Woechentlicher Verbesserungslauf.
 #
 # Laesst claude ohne Rueckfrage die gesammelten Vorschlaege durchgehen und die
-# guten umsetzen. Das Ergebnis wird geprueft und committet - aber WEDER GEPUSHT
-# NOCH UEBERNOMMEN. Was eine unbeaufsichtigte Sitzung am Code aendert, soll ein
-# Mensch gesehen haben, bevor es oeffentlich wird oder den laufenden Monitor
-# steuert. Die Meldung darueber kommt per Telegram.
+# guten umsetzen. Das Ergebnis geht auf den Zweig "test" - NIE auf main.
 #
-# Angenommen wird spaeter von Hand:  ./betrieb.sh verbesserung-annehmen
+# Der Weg in den Betrieb fuehrt ueber einen Menschen:
+#   1. Dieser Lauf pusht nach "test" und meldet per Telegram, was drinsteht.
+#   2. Ein Mensch sieht sich den Vergleich auf GitHub an und fuehrt ihn zusammen.
+#   3. Der Betrieb holt sich main:  ./betrieb.sh aktualisieren
+#
+# main ist auf GitHub geschuetzt, dieser Lauf kann es also gar nicht anfassen.
 #
 # Der wichtigste Gedanke: claude arbeitet NICHT im laufenden Verzeichnis,
 # sondern in einem Git-Klon daneben. Der Monitor laeuft alle zehn Minuten - ein
@@ -22,6 +24,7 @@ set -u
 LIVE="${KI_LIVE:-/home/Nutzer/ki-invest}"
 ARBEIT="${KI_ARBEIT:-/home/Nutzer/ki-invest-arbeit}"
 REPO="${KI_REPO:-git@github.com:metrodorian/ki-invest.git}"
+ZWEIG="${KI_ZWEIG:-test}"
 PYTHON="${KI_PYTHON:-/usr/bin/python3}"
 export PATH="/home/Nutzer/.local/node/bin:$PATH"
 
@@ -61,9 +64,13 @@ cd "$ARBEIT" || abbrechen "Arbeitskopie nicht erreichbar"
 
 git reset --quiet --hard HEAD
 git clean --quiet -fd
-git pull --quiet --ff-only || abbrechen "git pull fehlgeschlagen"
+git fetch --quiet origin || abbrechen "git fetch fehlgeschlagen"
+
+# Immer frisch von main abzweigen. Ein alter Testzweig wuerde die Arbeit von
+# Wochen aufeinanderstapeln, die nie zusammengefuehrt wurde.
+git checkout --quiet -B "$ZWEIG" origin/main || abbrechen "Zweig $ZWEIG nicht anlegbar"
 VOR=$(git rev-parse HEAD)
-notiz "Stand vor dem Lauf: $VOR"
+notiz "Zweig $ZWEIG von main abgezweigt, Stand $VOR"
 
 # Die gesammelten Vorschlaege und die Konfiguration kommen aus dem Betrieb -
 # im Repo stehen sie nicht, weil sie Laufzeitdaten sind.
@@ -164,16 +171,16 @@ if [ "$TROCKEN" = "1" ]; then
     exit 0
 fi
 
-# --------------------------------------------------------------- Sichern
-# Committet wird, gepusht NICHT. Was eine unbeaufsichtigte Sitzung an Code
-# aendert, soll ein Mensch gesehen haben, bevor es oeffentlich wird oder den
-# laufenden Monitor steuert. Der Commit liegt in der Arbeitskopie bereit.
+# ------------------------------------------------------- Sichern und pushen
+# Committet und auf den Testzweig gepusht. main bleibt unberuehrt - was eine
+# unbeaufsichtigte Sitzung schreibt, geht erst nach menschlicher Durchsicht in
+# den Betrieb.
 
 cd "$ARBEIT" || abbrechen "Arbeitskopie verschwunden"
 if [ -n "$(git status --porcelain)" ]; then
     git add -A
-    git commit --quiet -m "Woechentlicher Verbesserungslauf" \
-        -m "Automatisch erzeugt. Siehe VERBESSERUNG.md." || true
+    git commit --quiet -m "Woechentlicher Verbesserungslauf (Rest)" \
+        -m "Was claude nicht selbst committet hat. Siehe VERBESSERUNG.md." || true
 fi
 NACH=$(git rev-parse HEAD)
 if [ "$VOR" = "$NACH" ]; then
@@ -182,15 +189,17 @@ if [ "$VOR" = "$NACH" ]; then
     exit 0
 fi
 
-notiz "Committet: $NACH (nicht gepusht, nicht uebernommen)"
+git push --quiet --force-with-lease origin "$ZWEIG" \
+    || abbrechen "Push auf $ZWEIG fehlgeschlagen"
+notiz "Auf $ZWEIG gepusht: $NACH"
 
 # Vorschlaege als behandelt zurueckschreiben, damit sie nicht erneut auflaufen.
 cp "$ARBEIT/monitor/verbesserungen.json" "$LIVE/" 2>/dev/null || true
 
-BERICHT=$(sed -n '1,80p' "$ARBEIT/monitor/VERBESSERUNG.md" 2>/dev/null \
-          || sed -n '1,80p' "$ARBEIT/VERBESSERUNG.md" 2>/dev/null)
-ZUSAMMEN=$(echo "$BERICHT" | head -c 2200)
+BERICHT=$(cat "$ARBEIT/monitor/VERBESSERUNG.md" 2>/dev/null \
+          || cat "$ARBEIT/VERBESSERUNG.md" 2>/dev/null)
+VERGLEICH="https://github.com/metrodorian/ki-invest/compare/main...$ZWEIG"
 
-melden "🛠 <b>Verbesserungslauf liegt zur Durchsicht</b>%0AStand <code>${NACH:0:7}</code> in der Arbeitskopie committet, <b>nicht gepusht</b> und noch nicht uebernommen.%0A%0A$ZUSAMMEN%0A%0AAnnehmen: <code>./betrieb.sh verbesserung-annehmen</code>"
+melden "🛠 <b>Verbesserungslauf auf Zweig <code>$ZWEIG</code></b>%0A$(cd "$ARBEIT" && git log --format=%s -1)%0A%0A$(echo "$BERICHT" | head -c 1800)%0A%0A<a href=\"$VERGLEICH\">Vergleich auf GitHub ansehen</a>%0ADanach im Betrieb: <code>./betrieb.sh aktualisieren</code>"
 
-notiz "Fertig. Wartet auf Durchsicht."
+notiz "Fertig. Wartet auf Durchsicht: $VERGLEICH"
