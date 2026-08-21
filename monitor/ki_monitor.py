@@ -396,11 +396,24 @@ def tokennutzung_holen(kennung):
 
     veraenderung = None
     vergleich = None
+    # Die OpenRouter-Rangliste ist ein rollender WOCHENwert: Zwischen gestern und
+    # heute wechselt nur ein Siebtel der Grundlage. Ein Vergleich mit dem
+    # Vortag misst darum fast nichts, waehrend die Schwellen des Indikators
+    # (plus/minus ein Punkt) auf eine Wochenveraenderung geeicht sind. Deshalb
+    # den Eintrag suchen, der mindestens sechs Tage zurueckliegt.
+    heute = date.today()
     for frueher in reversed(verlauf[:-1]):
-        if frueher.get("anteil_china_prozent") is not None:
-            veraenderung = jetzt["anteil_china_prozent"] - frueher["anteil_china_prozent"]
-            vergleich = frueher["datum"]
-            break
+        if frueher.get("anteil_china_prozent") is None:
+            continue
+        try:
+            alter = (heute - date.fromisoformat(frueher["datum"])).days
+        except (TypeError, ValueError):
+            continue
+        if alter < 6:
+            continue
+        veraenderung = jetzt["anteil_china_prozent"] - frueher["anteil_china_prozent"]
+        vergleich = frueher["datum"]
+        break
 
     return {"jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
             "verlauf": verlauf[-30:]}
@@ -1015,6 +1028,13 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if monat_bp < -25 else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": monat_bp,
+            # Fuer die Rangfolge in der Zusammenfassung zaehlt die Bewegung, nicht
+            # der Stand: 273 Basispunkte sind die groesste Zahl im Feld, sagen aber
+            # fuer sich nichts. Durch fuenf geteilt, damit Basispunkte und
+            # Prozentpunkte vergleichbar werden - dieselbe Umrechnung, mit der
+            # auch das Barometer den Aufschlag gewichtet.
+            "vergleichswert": monat_bp / 5.0,
+            "kurzwert": "%+.0f Bp im Monat" % monat_bp,
         })
 
     # --- Dasselbe am unteren Ende der Bonitaetsskala
@@ -1041,6 +1061,8 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                       else "schlecht" if ccc_monat < -50 else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": ccc_monat,
+            "vergleichswert": ccc_monat / 5.0,
+            "kurzwert": "%+.0f Bp im Monat" % ccc_monat,
         })
 
     # --- Preis je Million Token: der direkte Effizienzmesswert
