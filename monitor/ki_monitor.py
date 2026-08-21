@@ -445,6 +445,20 @@ def kennzahlen_text(konfig):
                n.get("einkaufsverpflichtungen_mrd", 0),
                n.get("konsens_folgequartal_mrd", 0),
                n.get("worauf_achten", "")))
+    r = k.get("uebernahme_reibung") or {}
+    if r:
+        teile.append(
+            "  %s (Stand %s, %s)\n"
+            "    %s\n"
+            "    DAFUER:\n%s\n"
+            "    DAGEGEN:\n%s\n"
+            "    FOLGERUNG: %s"
+            % (r.get("bezeichnung", ""), r.get("stand", "?"), r.get("quelle", "?"),
+               r.get("kernsatz", ""),
+               "\n".join("      - " + b for b in r.get("belege_dafuer", [])),
+               "\n".join("      - " + b for b in r.get("belege_dagegen", [])),
+               r.get("folgerung", "")))
+
     v = k.get("vertiv_auftraege") or {}
     if v:
         letzte = v.get("letzte_bekannte") or {}
@@ -1501,6 +1515,14 @@ ERWARTUNGSWERTE - die Messlatten, an denen Zahlen zu messen sind
 Eine Zahl ist nur gut oder schlecht im Verhaeltnis zur Erwartung. "Rekordumsatz"
 heisst nichts, wenn der Konsens hoeher lag.
 %s
+
+ACHTUNG BEIM NUTZUNGSANTEIL: Der Indikator "Chinesischer Anteil am
+Tokenverbrauch" stammt aus der OpenRouter-Rangliste und misst Entwicklerverkehr.
+Unternehmensvolumen laeuft direkt zu den Anbietern oder ueber Azure, Bedrock und
+Vertex und fehlt dort vollstaendig. Lies die Hoehe NICHT als Marktanteil und
+NICHT als Beleg, dass westliche Anbieter bereits Umsatz verlieren - siehe den
+Abschnitt zur Uebernahme-Reibung oben. Aussagekraeftig ist allein die
+Veraenderung ueber die Wochen.
 
 Faehigkeit und Preis je Million Token - der direkte Effizienzmesswert.
 Nach Faehigkeit sortiert (Qualitaetswert 0-100), die faehigsten zuerst.
@@ -3387,6 +3409,23 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                         html_schuetzen(m["modell"]), html_schuetzen(m["anbieter"]),
                         m["land"], m["billionen"]))
         t.append("</table></div>")
+        r = ((konfig.get("kennzahlen") or {}).get("uebernahme_reibung") or {})
+        if r:
+            t.append('<div class="karte" style="margin-top:10px"><b>%s</b>'
+                     '<div class="klein" style="margin:6px 0">%s</div>'
+                     '<div class="klein"><b>Daf&uuml;r:</b><ul class="liste">%s</ul>'
+                     '<b>Dagegen:</b><ul class="liste">%s</ul></div>'
+                     '<div class="klein" style="margin-top:6px"><b>Folgerung:</b> %s</div>'
+                     '<div class="klein" style="margin-top:6px">Quelle: %s</div></div>'
+                     % (html_schuetzen(r.get("bezeichnung", "")),
+                        html_schuetzen(r.get("kernsatz", "")),
+                        "".join("<li>%s</li>" % html_schuetzen(b)
+                                for b in r.get("belege_dafuer", [])),
+                        "".join("<li>%s</li>" % html_schuetzen(b)
+                                for b in r.get("belege_dagegen", [])),
+                        html_schuetzen(r.get("folgerung", "")),
+                        html_schuetzen(r.get("quelle", "?"))))
+
         t.append('<div class="klein" style="margin-top:8px"><b>Vorsicht bei der '
                  'Hoehe.</b> Gemessen an der OpenRouter-Rangliste, also am '
                  'Entwicklerverkehr. Unternehmensvolumen laeuft direkt zu OpenAI, '

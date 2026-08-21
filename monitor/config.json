@@ -572,6 +572,23 @@
       },
       "naechster_termin": "2026-10-28",
       "worauf_achten": "Kommt die Zahl zurueck oder bleibt sie weg? Bleibt sie weg, ist das ein Signal fuer sich. Kommt sie zurueck: Book-to-Bill unter 1 bedeutet, der Auftragsbestand schrumpft - das frueheste harte Signal fuer die These."
+    },
+    "uebernahme_reibung": {
+      "bezeichnung": "Reibung zwischen Preisvorteil und tatsaechlichem Wechsel",
+      "stand": "2026-07-22",
+      "quelle": "NZZ, 22.07.2026, Malin Hunziker: Schweizer Firmen und chinesische KI-Modelle",
+      "kernsatz": "Zwischen 'zehnmal billiger' und 'wird auch genommen' liegen Eigenbetrieb, Inferenzanbieter, Entzerrung politischer Faerbung und Nutzungsregeln. Der Preisvorteil schlaegt deshalb NICHT eins zu eins auf westliche Umsaetze durch.",
+      "belege_dafuer": [
+        "Oxygen at Work (CH, 75 Beschaeftigte) setzt Kimi seit Juni ein und spart rund 40 Prozent der KI-Kosten. Kimi K3 entstand trotz US-Exportbeschraenkungen auf schwaecheren Chips - genau der Mechanismus der These.",
+        "Artificial Analysis ordnet Kimi K3 bei Index 57 ein, auf Hoehe von Opus 4.8 und GPT-5.5, hinter Fable 5 und GPT-5.6 Sol. Deckt sich mit der eigenen Modelltabelle."
+      ],
+      "belege_dagegen": [
+        "Von zwanzig Mitgliedsfirmen des Verbands Swiss AI testen nur einzelne, die meisten halten sich zurueck.",
+        "Das Startup Eduwo brach den DeepSeek-Versuch ab: Aufwand fuer Eigenbetrieb und Entzerrung stand in keinem Verhaeltnis zu rund hundert Franken Ersparnis im Monat.",
+        "Selbst der Anwender, fuer den es sich lohnt, verbietet das Modell fuer personenbezogene Daten, Betriebsdaten und Zugangsschluessel und laesst es nur sechs Entwickler nutzen - ueber einen US-Inferenzanbieter als Barriere.",
+        "Open-Weight heisst offengelegte Parameter, nicht offengelegte Trainingsdaten. Politische Faerbung laesst sich einem grossen Modell kaum wieder austreiben (ETH AI Center), was den Einsatzbereich einschraenkt."
+      ],
+      "folgerung": "Entwickler wechseln sofort, Unternehmen brauchen Jahre. Der hohe chinesische Anteil in der OpenRouter-Rangliste misst das erste Segment, nicht das zweite. Er ist ein Fruehindikator fuer Preisdruck, KEIN Marktanteil und kein Beleg dafuer, dass westliche Anbieter bereits Umsatz verlieren. Fuer eine Haltedauer von vier bis sechs Wochen wirkt die Effizienzseite langsamer, als die Preistabelle nahelegt."
     }
   }
 }
