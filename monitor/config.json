@@ -192,7 +192,12 @@
     {
       "thema": "Auftragseingang Ausruestung",
       "query": "Vertiv OR \"Comfort Systems\" orders backlog book-to-bill data center"
-    }
+    },
+    "Qwen 4 release",
+    "DeepSeek V5",
+    "Kimi K4",
+    "GPT-6 release",
+    "Gemini 3.5 Pro release"
   ],
   "blogs": [
     {
@@ -655,5 +660,52 @@
       ],
       "folgerung": "Entwickler wechseln sofort, Unternehmen brauchen Jahre. Der hohe chinesische Anteil in der OpenRouter-Rangliste misst das erste Segment, nicht das zweite. Er ist ein Fruehindikator fuer Preisdruck, KEIN Marktanteil und kein Beleg dafuer, dass westliche Anbieter bereits Umsatz verlieren. Fuer eine Haltedauer von vier bis sechs Wochen wirkt die Effizienzseite langsamer, als die Preistabelle nahelegt."
     }
+  },
+  "modell_releases": {
+    "stand": "2026-08-21",
+    "quelle": "aireleasetracker.com, llmgateway.io/timeline, Berichterstattung und Prognosemaerkte",
+    "hinweis": "Was als Naechstes kommt, entscheidet ueber Alarmauslöser 3: ein Effizienzdurchbruch im Rang eines DeepSeek-Moments. Ein chinesisches Modell auf Spitzenniveau zu einem Zehntel des Preises bestaetigt die These schlagartig; ein westliches Modell, das den Qualitaetsvorsprung wieder deutlich ausbaut, schwaecht sie. Die Angaben sind Erwartungen aus Berichten und Lecks, keine Zusagen der Anbieter.",
+    "erwartet": [
+      {
+        "anbieter": "Google",
+        "modell": "Gemini 3.5 Pro",
+        "erwartet": "angekuendigt, ohne Datum",
+        "sicherheit": "angekuendigt",
+        "land": "US",
+        "bedeutung": "Preis-Leistungs-Fuehrer der westlichen Spitzengruppe. Ein grosser Sprung nach unten beim Preis verkleinert die Luecke zu China."
+      },
+      {
+        "anbieter": "OpenAI",
+        "modell": "GPT-6",
+        "erwartet": "zweite Jahreshaelfte 2026",
+        "sicherheit": "erwartet, nicht angekuendigt",
+        "land": "US",
+        "bedeutung": "Das wichtigste westliche Ereignis. Ein deutlicher Qualitaetssprung rechtfertigt die Investitionen nachtraeglich und arbeitet GEGEN die These; ein kleiner Schritt zum gewohnten Preis bestaetigt, dass Geld allein keinen Vorsprung mehr kauft."
+      },
+      {
+        "anbieter": "Alibaba",
+        "modell": "Qwen 4.0",
+        "erwartet": "September 2026 (Lecks)",
+        "sicherheit": "Geruecht",
+        "land": "CN",
+        "bedeutung": "Chinas naechster Anlauf auf die Spitzengruppe. Erreicht Qwen 4 Guete 97 und mehr zu Qwen-Preisen, ist die Preisluecke bei gleicher Faehigkeit belegt statt behauptet - das staerkste Einzelereignis FUER die These."
+      },
+      {
+        "anbieter": "Moonshot",
+        "modell": "Kimi K4",
+        "erwartet": "offen",
+        "sicherheit": "unbestaetigt",
+        "land": "CN",
+        "bedeutung": "K3 sitzt bereits auf Guete 97 zu 3,20 USD. Ein Nachfolger mit offenen Gewichten auf Fable-Niveau waere der zweite DeepSeek-Moment."
+      },
+      {
+        "anbieter": "DeepSeek",
+        "modell": "DeepSeek V5",
+        "erwartet": "offen",
+        "sicherheit": "unbestaetigt",
+        "land": "CN",
+        "bedeutung": "DeepSeek hat den ersten Schock ausgeloest. V4 Flash fuehrt heute die Verbrauchsrangliste an - ein V5 traefe auf eine bereits gewonnene Nutzerbasis."
+      }
+    ]
   }
 }

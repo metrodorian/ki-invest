@@ -419,6 +419,18 @@ def tokennutzung_holen(kennung):
             "verlauf": verlauf[-30:]}
 
 
+def modell_releases_text(konfig):
+    """Die erwarteten Veroeffentlichungen als Text fuer den Claude-Aufruf."""
+    rel = (konfig.get("modell_releases") or {}).get("erwartet") or []
+    if not rel:
+        return "  (keine hinterlegt)"
+    return "\n".join(
+        "  %-2s %-16s %-26s [%s]\n      %s"
+        % (e.get("land", "?"), e.get("modell", "?"), e.get("erwartet", "offen"),
+           e.get("sicherheit", "?"), e.get("bedeutung", ""))
+        for e in rel)
+
+
 def kennzahlen_text(konfig):
     """
     Formt die hinterlegten Erwartungswerte als Text: den Analystenkonsens zum
@@ -1835,6 +1847,15 @@ NICHT als Beleg, dass westliche Anbieter bereits Umsatz verlieren - siehe den
 Abschnitt zur Uebernahme-Reibung oben. Aussagekraeftig ist allein die
 Veraenderung ueber die Wochen.
 
+ERWARTETE MODELL-VEROEFFENTLICHUNGEN
+Was als Naechstes kommt, entscheidet ueber Ausloeser 3, den Effizienzdurchbruch.
+Ein chinesisches Modell auf Spitzenniveau zu einem Zehntel des Preises
+bestaetigt die These schlagartig; ein westliches Modell, das den
+Qualitaetsvorsprung wieder deutlich ausbaut, schwaecht sie. Wenn du in den
+Schlagzeilen eine dieser Veroeffentlichungen siehst, ist das eine Eilmeldung
+wert - und trag die Guete und den Preis danach in die Modelltabelle nach.
+%s
+
 Faehigkeit und Preis je Million Token - der direkte Effizienzmesswert.
 Nach Faehigkeit sortiert (Qualitaetswert 0-100), die faehigsten zuerst.
 Entscheidend ist nicht der billigste Preis, sondern der Preis bei GLEICHER
@@ -2006,6 +2027,7 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
         kennzahlen_text(konfig),
+        modell_releases_text(konfig),
         ((("\n".join("  Guete %3s  %-24s %-10s %s  %s USD Ausgabe%s"
                     % (m.get("faehigkeit", "?"), m["modell"], m["anbieter"],
                        m.get("land", ""),
@@ -3791,6 +3813,36 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  'Stand: %s.</div>'
                  % (grenze, html_schuetzen(token.get("quelle", "?")),
                     html_schuetzen(token.get("stand", "?"))))
+
+    # ---- Was als Naechstes erwartet wird
+    rel = (konfig.get("modell_releases") or {})
+    if rel.get("erwartet"):
+        t.append("<h2>Erwartete Modell-Veroeffentlichungen</h2>")
+        t.append('<div class="klein" style="margin-bottom:8px">%s</div>'
+                 % html_schuetzen(rel.get("hinweis", "")))
+        t.append("<div class='tabelle'><table><tr><th>Modell</th><th>Anbieter</th>"
+                 "<th>Land</th><th>Erwartet</th><th>Sicherheit</th>"
+                 "<th>Was es bedeuten wuerde</th></tr>")
+        for e in rel["erwartet"]:
+            t.append("<tr%s><td><b>%s</b></td><td>%s</td><td class='klein'>%s</td>"
+                     "<td>%s</td><td class='klein'>%s</td>"
+                     "<td class='klein'>%s</td></tr>"
+                     % (" style='background:rgba(255,160,120,.07)'"
+                        if e.get("land") == "CN" else "",
+                        html_schuetzen(e.get("modell", "?")),
+                        html_schuetzen(e.get("anbieter", "")),
+                        html_schuetzen(e.get("land", "")),
+                        html_schuetzen(e.get("erwartet", "offen")),
+                        html_schuetzen(e.get("sicherheit", "")),
+                        html_schuetzen(e.get("bedeutung", ""))))
+        t.append("</table></div>")
+        t.append('<div class="klein" style="margin-top:8px">Erwartungen aus '
+                 'Berichten und Lecks, keine Zusagen der Anbieter. Quelle: %s, '
+                 'Stand %s. Die Nachrichtensuche verfolgt diese Namen mit &ndash; '
+                 'eine Veroeffentlichung taucht dort auf, sobald sie gemeldet '
+                 'wird.</div>'
+                 % (html_schuetzen(rel.get("quelle", "?")),
+                    html_schuetzen(rel.get("stand", "?"))))
 
     # ---- Tatsaechlicher Verbrauch
     nutzung = (konfig.get("_tokennutzung") or {})

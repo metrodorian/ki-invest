@@ -72,22 +72,24 @@ git checkout --quiet -B "$ZWEIG" origin/main || abbrechen "Zweig $ZWEIG nicht an
 VOR=$(git rev-parse HEAD)
 notiz "Zweig $ZWEIG von main abgezweigt, Stand $VOR"
 
-# Die gesammelten Vorschlaege und die Konfiguration kommen aus dem Betrieb -
-# im Repo stehen sie nicht, weil sie Laufzeitdaten sind.
-cp "$LIVE/verbesserungen.json" "$ARBEIT/monitor/" 2>/dev/null || true
+# Die Konfiguration und die Daten kommen aus dem Betrieb - im Repo stehen sie
+# nicht, weil sie Laufzeitdaten sind.
 cp "$LIVE/daten.json" "$ARBEIT/monitor/" 2>/dev/null || true
 cp "$LIVE/claude.json" "$ARBEIT/monitor/" 2>/dev/null || true
 
-OFFEN=$("$PYTHON" - <<'PY'
-import json, os
-try:
-    v = json.load(open("monitor/verbesserungen.json"))
-except Exception:
-    v = []
-print(sum(1 for e in v if isinstance(e, dict) and not e.get("erledigt")))
-PY
-)
-notiz "Offene Vorschlaege: $OFFEN"
+# Vorgelegt wird, was seit dem letzten Verbesserungslauf dazugekommen ist.
+# Alles Aeltere gilt als abgearbeitet - ob claude es umgesetzt oder begruendet
+# verworfen hat, spielt keine Rolle. Das ist robuster, als sich darauf zu
+# verlassen, dass jeder Eintrag sauber als erledigt markiert wurde: Bricht ein
+# Lauf ab, gingen die Vermerke verloren und dieselben Vorschlaege liefen ewig
+# wieder auf. Was weiterhin wichtig ist, schlaegt claude ohnehin erneut vor.
+STAND_DATEI="$LIVE/verbesserung.stand"
+SEIT=$(cat "$STAND_DATEI" 2>/dev/null || true)
+notiz "Beruecksichtige Vorschlaege seit: ${SEIT:-Anfang}"
+
+OFFEN=$(SEIT="$SEIT" KI_LIVE="$LIVE" "$PYTHON" "$LIVE/vorschlaege_auswaehlen.py" \
+        "$ARBEIT/monitor/verbesserungen.json")
+notiz "Neue Vorschlaege seit dem letzten Lauf: ${OFFEN:-0}"
 
 if [ "${OFFEN:-0}" -lt 1 ]; then
     notiz "Nichts zu tun."
@@ -193,8 +195,9 @@ git push --quiet --force-with-lease origin "$ZWEIG" \
     || abbrechen "Push auf $ZWEIG fehlgeschlagen"
 notiz "Auf $ZWEIG gepusht: $NACH"
 
-# Vorschlaege als behandelt zurueckschreiben, damit sie nicht erneut auflaufen.
-cp "$ARBEIT/monitor/verbesserungen.json" "$LIVE/" 2>/dev/null || true
+# Stand fortschreiben: Alles bis hierher gilt ab jetzt als abgearbeitet.
+date -Iseconds > "$STAND_DATEI"
+notiz "Stand fortgeschrieben auf $(cat "$STAND_DATEI")"
 
 BERICHT=$(cat "$ARBEIT/monitor/VERBESSERUNG.md" 2>/dev/null \
           || cat "$ARBEIT/VERBESSERUNG.md" 2>/dev/null)
