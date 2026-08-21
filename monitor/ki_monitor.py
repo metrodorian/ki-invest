@@ -305,6 +305,106 @@ def konfig_speichern(konfig):
     json_speichern(LOKAL_PFAD, lokal)
 
 
+NUTZUNG_PFAD = os.path.join(BASIS, "tokennutzung.json")
+
+# Anbieter, die chinesischen Modellen zuzurechnen sind.
+CHINESISCHE_ANBIETER = ("deepseek", "tencent", "xiaomi", "z-ai", "zhipu", "alibaba",
+                        "qwen", "moonshot", "moonshotai", "baidu", "minimax",
+                        "01-ai", "bytedance", "stepfun", "inclusionai")
+
+
+def tokennutzung_holen(kennung):
+    """
+    Liest von der OpenRouter-Rangliste, wie viele Token je Anbieter tatsaechlich
+    abgerechnet werden.
+
+    Die Preisluecke allein sagt nichts darueber, ob jemand sie nutzt. Das hier
+    ist das einzige oeffentliche Fenster auf tatsaechliche Nutzung.
+
+    WICHTIGE EINSCHRAENKUNG: OpenRouter ist nicht der Markt. Es vermittelt vor
+    allem Entwickler- und Bastelverkehr; Unternehmensvolumen laeuft direkt zu
+    OpenAI, Anthropic und Google oder ueber Azure, Bedrock und Vertex und taucht
+    hier gar nicht auf. Der absolute Anteil ueberzeichnet die chinesische Seite
+    daher stark. Aussagekraeftig ist allein die VERAENDERUNG ueber die Wochen -
+    und zwar fuer das preisempfindliche Segment, in dem sich ein Wechsel
+    zuerst zeigen wuerde.
+
+    Die Seite wird als HTML gelesen, es gibt keine offene Schnittstelle dafuer.
+    Bricht das Muster, liefert die Funktion nichts und der letzte Stand bleibt
+    stehen - lieber keine Zahl als eine falsche.
+    """
+    try:
+        roh = abrufen("https://openrouter.ai/rankings", kennung, versuche=2)
+    except IOError:
+        return None
+    text = roh.decode("utf-8", "ignore")
+
+    # Die Liste steht als "<Modell> by <Anbieter>  N.NT tokens" in der Seite.
+    # Erst die Auszeichnung entfernen, sonst stehen Tags zwischen Name und Zahl.
+    klar = re.sub(r"<[^>]+>", " ", text)
+    klar = re.sub(r"\s+", " ", klar)
+
+    einheiten = {"M": 1e-6, "B": 1e-3, "T": 1.0}
+    gefunden = {}
+    modelle = []
+    # Nur am " by <Anbieter> N.NT tokens" verankern. Ein Muster, das auch den
+    # Modellnamen erzwingt, verliert Zeilen, deren Name Sonderzeichen enthaelt -
+    # und ein fehlender Posten verfaelscht den Anteil.
+    for treffer in re.finditer(
+            r" by ([a-z0-9-]+)\s+([\d.]+)\s*([MBT])\s+tokens", klar):
+        anbieter = treffer.group(1).lower()
+        menge = float(treffer.group(2)) * einheiten.get(treffer.group(3).upper(), 0)
+        # Ein Anbieter steht mit mehreren Modellen in der Liste.
+        gefunden[anbieter] = gefunden.get(anbieter, 0.0) + menge
+        # Der Modellname steht davor; fuehrenden Fliesstext abschneiden.
+        vorlauf = klar[max(0, treffer.start() - 60):treffer.start()]
+        # Die Rangnummer steht als "7 . " mit Leerzeichen um den Punkt, eine
+        # Versionsnummer wie "V2.5" nicht - deshalb die Leerzeichen erzwingen.
+        name = re.split(r"\s\d+\s+\.\s+", " " + vorlauf)[-1].strip(" .:-")
+        modelle.append({"modell": name[-40:] or "?", "anbieter": anbieter,
+                        "billionen": round(menge, 3),
+                        "land": "CN" if anbieter in CHINESISCHE_ANBIETER else "US"})
+
+    if len(gefunden) < 4:
+        return None
+
+    gesamt = sum(gefunden.values())
+    china = sum(m for a, m in gefunden.items() if a in CHINESISCHE_ANBIETER)
+    anteil = (china / gesamt * 100) if gesamt else None
+
+    jetzt = {
+        "datum": date.today().isoformat(),
+        "anteil_china_prozent": round(anteil, 2) if anteil is not None else None,
+        "summe_billionen": round(gesamt, 2),
+        "china_billionen": round(china, 2),
+        "anbieter": {a: round(m, 3) for a, m in
+                     sorted(gefunden.items(), key=lambda x: -x[1])[:15]},
+        "modelle": modelle[:15],
+    }
+
+    verlauf = json_laden(NUTZUNG_PFAD, [])
+    if not isinstance(verlauf, list):
+        verlauf = []
+    # Hoechstens ein Eintrag je Tag - die Rangliste ist ein Wochenwert.
+    if not verlauf or verlauf[-1].get("datum") != jetzt["datum"]:
+        verlauf.append(jetzt)
+        json_speichern(NUTZUNG_PFAD, verlauf[-120:])
+    else:
+        verlauf[-1] = jetzt
+        json_speichern(NUTZUNG_PFAD, verlauf[-120:])
+
+    veraenderung = None
+    vergleich = None
+    for frueher in reversed(verlauf[:-1]):
+        if frueher.get("anteil_china_prozent") is not None:
+            veraenderung = jetzt["anteil_china_prozent"] - frueher["anteil_china_prozent"]
+            vergleich = frueher["datum"]
+            break
+
+    return {"jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
+            "verlauf": verlauf[-30:]}
+
+
 def kennzahlen_text(konfig):
     """
     Formt die hinterlegten Erwartungswerte als Text: den Analystenkonsens zum
@@ -326,17 +426,49 @@ def kennzahlen_text(konfig):
             "    Eigene Prognose des Unternehmens %.1f Mrd +/- %d%%\n"
             "    Rechenzentrum geschaetzt %.1f Mrd (%d%% Anteil, abgeleitet)\n"
             "    Vorquartal %.1f Mrd, davon Rechenzentrum %.1f Mrd\n"
+            "    Bruttomarge gefuehrt bei %.1f%% (GAAP %.1f%%), Betriebsaufwand "
+            "%.1f Mrd\n"
+            "    Einkaufsverpflichtungen zuletzt ueber %.0f Mrd\n"
             "    KONSENS FUER DAS FOLGEQUARTAL: %.1f Mrd - das ist die "
             "eigentliche Messlatte.\n"
             "    Eine Prognose darunter bricht die Wachstumserwartung und "
-            "arbeitet FUER die These."
+            "arbeitet FUER die These.\n"
+            "    %s"
             % (n.get("bezeichnung", "Nvidia"), n.get("termin", "?"),
                " (nach US-Boersenschluss)" if n.get("nach_boersenschluss") else "",
                n.get("konsens_umsatz_mrd", 0), n.get("konsens_gewinn_je_aktie", 0),
                n.get("eigene_prognose_mrd", 0), n.get("eigene_prognose_spanne_prozent", 0),
                n.get("konsens_rechenzentrum_mrd", 0), n.get("rechenzentrum_anteil_prozent", 0),
                n.get("vorquartal_umsatz_mrd", 0), n.get("vorquartal_rechenzentrum_mrd", 0),
-               n.get("konsens_folgequartal_mrd", 0)))
+               n.get("konsens_bruttomarge_prozent", 0), n.get("bruttomarge_gaap_prozent", 0),
+               n.get("betriebsaufwand_mrd", 0),
+               n.get("einkaufsverpflichtungen_mrd", 0),
+               n.get("konsens_folgequartal_mrd", 0),
+               n.get("worauf_achten", "")))
+    v = k.get("vertiv_auftraege") or {}
+    if v:
+        letzte = v.get("letzte_bekannte") or {}
+        q2 = v.get("q2_2026") or {}
+        teile.append(
+            "  %s, Stand %s\n"
+            "    ACHTUNG, BEFUND: %s\n"
+            "    Warum das zaehlt: %s\n"
+            "    Zuletzt veroeffentlicht (%s): Auftragseingang %+d%%, "
+            "Book-to-Bill %.1f, Auftragsbestand %.0f Mrd\n"
+            "    Q2 2026: Umsatz %.3f Mrd gegen Konsens %.2f Mrd (VERFEHLT), "
+            "Marge %.1f%% (+%d Bp), Kurs %+d%%\n"
+            "    Naechster Termin %s. %s"
+            % (v.get("bezeichnung", "Vertiv"), v.get("stand", "?"),
+               v.get("befund", ""), v.get("warum_es_zaehlt", ""),
+               letzte.get("quartal", "?"),
+               letzte.get("auftragseingang_wachstum_prozent", 0),
+               letzte.get("book_to_bill", 0), letzte.get("auftragsbestand_mrd", 0),
+               q2.get("umsatz_mrd", 0), q2.get("konsens_umsatz_mrd", 0),
+               q2.get("betriebsmarge_prozent", 0),
+               q2.get("betriebsmarge_veraenderung_bp", 0),
+               q2.get("kursreaktion_prozent", 0),
+               v.get("naechster_termin", "?"), v.get("worauf_achten", "")))
+
     if h:
         einzeln = h.get("einzeln") or {}
         teile.append(
@@ -731,6 +863,32 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
             "veraenderung_monat": monat_bp,
         })
 
+    # --- Dasselbe am unteren Ende der Bonitaetsskala
+    ccc = zusatz.get("ccc_aufschlag") if zusatz else None
+    if ccc:
+        ccc_bp = ccc["jetzt"] * 100
+        ccc_monat = ccc["monat"] * 100
+        ccc_woche = ccc["woche"] * 100
+        verhaeltnis = (ccc["jetzt"] / aufschlag["jetzt"]) if aufschlag and aufschlag["jetzt"] else None
+        ind.append({
+            "name": "Risikoaufschlag CCC und schlechter",
+            "wert": ccc_bp,
+            "einheit": "Basispunkte (%+.0f Bp Woche, %+.0f Bp Monat%s)"
+                       % (ccc_woche, ccc_monat,
+                          ", das %.1f-fache des Index" % verhaeltnis if verhaeltnis else ""),
+            "erklaerung": "Derselbe Messwert fuer die schwaechsten Schuldner. "
+                          "<b>Hier sitzt die gehebelte Rechenzentrumsfinanzierung</b> "
+                          "&ndash; der breite Index mittelt sie mit soliden "
+                          "Emittenten weg und kann ruhig aussehen, waehrend genau "
+                          "die Schuldner in Not geraten, auf die es ankommt. "
+                          "Steigt dieser Wert schneller als der Index, bricht die "
+                          "Finanzierung am unteren Ende zuerst.",
+            "these": ("gut" if ccc_monat > 50
+                      else "schlecht" if ccc_monat < -50 else "neutral"),
+            "nachkomma": 0,
+            "veraenderung_monat": ccc_monat,
+        })
+
     # --- Preis je Million Token: der direkte Effizienzmesswert
     token = zusatz.get("tokenpreise") if zusatz else None
     if token:
@@ -756,6 +914,31 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                           else "schlecht" if j["luecke"] < 2 else "neutral"),
                 "nachkomma": 1,
             })
+
+    # --- Wird die Preisluecke auch genutzt?
+    nutzung = zusatz.get("tokennutzung") if zusatz else None
+    if nutzung and nutzung["jetzt"].get("anteil_china_prozent") is not None:
+        n = nutzung["jetzt"]
+        v = nutzung.get("veraenderung")
+        ind.append({
+            "name": "Chinesischer Anteil am Tokenverbrauch",
+            "wert": n["anteil_china_prozent"],
+            "einheit": ("%% der abgerechneten Token (%.1f von %.1f Bio.%s)"
+                        % (n["china_billionen"], n["summe_billionen"],
+                           ", %+.1f Pkt seit %s" % (v, nutzung["vergleich"])
+                           if v is not None else "")),
+            "erklaerung": "Was tatsaechlich verbraucht wird, nicht was es kostet. "
+                          "<b>Ein steigender Anteil heisst, dass die Preisluecke "
+                          "genutzt wird</b> und teure westliche Rechenleistung "
+                          "ersetzt. <b>Achtung:</b> gemessen an der "
+                          "OpenRouter-Rangliste, also am Entwicklerverkehr. "
+                          "Unternehmensvolumen laeuft direkt zu den Anbietern und "
+                          "fehlt hier ganz &ndash; die Hoehe ueberzeichnet China "
+                          "stark, aussagekraeftig ist allein die Veraenderung.",
+            "these": ("gut" if (v is not None and v > 1)
+                      else "schlecht" if (v is not None and v < -1) else "neutral"),
+            "nachkomma": 1,
+        })
         ind.append({
             "name": "Preis je Million Token",
             "wert": j["schnitt_ausgabe"],
@@ -3056,6 +3239,10 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                      '<td class="z">%.1f Mrd</td></tr>'
                      '<tr><td>Vorquartal</td><td class="z">%.1f Mrd '
                      '(Rechenzentrum %.1f)</td></tr>'
+                     '<tr><td>Bruttomarge (gefuehrt)</td>'
+                     '<td class="z"><b>%.1f%%</b> (GAAP %.1f%%)</td></tr>'
+                     '<tr><td>Einkaufsverpflichtungen</td>'
+                     '<td class="z">&uuml;ber %.0f Mrd</td></tr>'
                      '<tr style="background:rgba(120,160,255,.10)">'
                      '<td><b>Konsens Folgequartal</b></td>'
                      '<td class="z"><b>%.1f Mrd USD</b></td></tr>'
@@ -3070,8 +3257,48 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                         n.get("konsens_rechenzentrum_mrd", 0),
                         n.get("vorquartal_umsatz_mrd", 0),
                         n.get("vorquartal_rechenzentrum_mrd", 0),
+                        n.get("konsens_bruttomarge_prozent", 0),
+                        n.get("bruttomarge_gaap_prozent", 0),
+                        n.get("einkaufsverpflichtungen_mrd", 0),
                         n.get("konsens_folgequartal_mrd", 0),
-                        html_schuetzen(n.get("hinweis", ""))))
+                        html_schuetzen((n.get("hinweis", "") + " ")
+                                       + n.get("worauf_achten", ""))))
+        v = kz.get("vertiv_auftraege") or {}
+        if v:
+            letzte = v.get("letzte_bekannte") or {}
+            q2 = v.get("q2_2026") or {}
+            t.append('<div class="karte schlecht"><b>%s &middot; Stand %s</b>'
+                     '<div class="klein" style="margin:6px 0"><b>Befund:</b> %s</div>'
+                     '<div class="tabelle"><table>'
+                     '<tr><td>Auftragseingang %s</td><td class="z">+%d%%</td></tr>'
+                     '<tr><td>Book-to-Bill %s</td><td class="z">%.1f</td></tr>'
+                     '<tr><td>Auftragsbestand</td><td class="z">%.0f Mrd</td></tr>'
+                     '<tr style="background:rgba(255,120,120,.10)">'
+                     '<td><b>Q2 2026</b></td>'
+                     '<td class="z"><b>nicht mehr genannt</b></td></tr>'
+                     '<tr><td>Q2-Umsatz</td><td class="z">%.3f Mrd '
+                     '(Konsens %.2f)</td></tr>'
+                     '<tr><td>Q2-Marge</td><td class="z">%.1f%% (+%d Bp)</td></tr>'
+                     '<tr><td>Kursreaktion</td><td class="z">%+d%%</td></tr>'
+                     '</table></div>'
+                     '<div class="klein" style="margin-top:6px">%s %s '
+                     'N&auml;chster Termin: %s.</div></div>'
+                     % (html_schuetzen(v.get("bezeichnung", "")),
+                        html_schuetzen(v.get("stand", "")),
+                        html_schuetzen(v.get("befund", "")),
+                        html_schuetzen(letzte.get("quartal", "")),
+                        letzte.get("auftragseingang_wachstum_prozent", 0),
+                        html_schuetzen(letzte.get("quartal", "")),
+                        letzte.get("book_to_bill", 0),
+                        letzte.get("auftragsbestand_mrd", 0),
+                        q2.get("umsatz_mrd", 0), q2.get("konsens_umsatz_mrd", 0),
+                        q2.get("betriebsmarge_prozent", 0),
+                        q2.get("betriebsmarge_veraenderung_bp", 0),
+                        q2.get("kursreaktion_prozent", 0),
+                        html_schuetzen(v.get("warum_es_zaehlt", "")),
+                        html_schuetzen(v.get("worauf_achten", "")),
+                        html_schuetzen(v.get("naechster_termin", "?"))))
+
         if h:
             einzeln = h.get("einzeln") or {}
             t.append('<div class="karte"><b>%s &middot; %s</b>'
@@ -3135,6 +3362,39 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  'Stand: %s.</div>'
                  % (grenze, html_schuetzen(token.get("quelle", "?")),
                     html_schuetzen(token.get("stand", "?"))))
+
+    # ---- Tatsaechlicher Verbrauch
+    nutzung = (konfig.get("_tokennutzung") or {})
+    if nutzung.get("jetzt", {}).get("modelle"):
+        j = nutzung["jetzt"]
+        v = nutzung.get("veraenderung")
+        t.append("<h2>Wer tatsaechlich verbraucht wird</h2>")
+        t.append('<div class="klein" style="margin-bottom:8px">Die Preisluecke '
+                 'sagt nichts darueber, ob jemand sie nutzt. Chinesische Anbieter '
+                 'stellen derzeit <b>%.1f%%</b> der abgerechneten Token '
+                 '(%.1f von %.1f Billionen)%s.</div>'
+                 % (j["anteil_china_prozent"], j["china_billionen"],
+                    j["summe_billionen"],
+                    ", <b>%+.1f Punkte</b> seit %s" % (v, nutzung["vergleich"])
+                    if v is not None else ""))
+        t.append("<div class='tabelle'><table><tr><th>Modell</th><th>Anbieter</th>"
+                 "<th>Land</th><th class='z'>Billionen Token</th></tr>")
+        for m in j["modelle"]:
+            t.append("<tr%s><td>%s</td><td>%s</td><td class='klein'>%s</td>"
+                     "<td class='z'><b>%.2f</b></td></tr>"
+                     % (" style='background:rgba(255,160,120,.07)'"
+                        if m["land"] == "CN" else "",
+                        html_schuetzen(m["modell"]), html_schuetzen(m["anbieter"]),
+                        m["land"], m["billionen"]))
+        t.append("</table></div>")
+        t.append('<div class="klein" style="margin-top:8px"><b>Vorsicht bei der '
+                 'Hoehe.</b> Gemessen an der OpenRouter-Rangliste, also am '
+                 'Entwicklerverkehr. Unternehmensvolumen laeuft direkt zu OpenAI, '
+                 'Anthropic und Google oder ueber Azure, Bedrock und Vertex und '
+                 'taucht hier gar nicht auf &ndash; der Anteil ueberzeichnet China '
+                 'deshalb stark. Aussagekraeftig ist allein die Veraenderung ueber '
+                 'die Wochen, und zwar fuer das preisempfindliche Segment, in dem '
+                 'sich ein Wechsel zuerst zeigen wuerde.</div>')
 
     # ---- Regierung
     t.append("<h2>Regierungsvorhaben (Federal Register)</h2>")
@@ -3284,6 +3544,25 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
     else:
         fehler.append("Risikoaufschlag (FRED) nicht abrufbar")
 
+    # Der breite Index verdeckt, wo der Stress sitzt: Die gehebelte
+    # Rechenzentrumsfinanzierung liegt am unteren Ende der Bonitaetsskala, und
+    # dort sind die Aufschlaege ein Vielfaches des Index.
+    nutzung = tokennutzung_holen(kennung)
+    if nutzung:
+        zusatz["tokennutzung"] = nutzung
+    else:
+        fehler.append("Nutzungsanteil (OpenRouter-Rangliste) nicht auswertbar")
+
+    reihe_ccc = fred_reihe(kennung, reihe="BAMLH0A3HYC")
+    if len(reihe_ccc) > 25:
+        jetzt = reihe_ccc[-1][1]
+        zusatz["ccc_aufschlag"] = {
+            "jetzt": jetzt,
+            "woche": jetzt - reihe_ccc[-6][1],
+            "monat": jetzt - reihe_ccc[-22][1],
+            "stand": reihe_ccc[-1][0],
+        }
+
     indikatoren = indikatoren_bauen(gute_kurse, gruppen, zusatz)
 
     gruppen_ansicht = []
@@ -3390,6 +3669,7 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         "nachrichten": nachrichten, "regierung": regierung, "blogs": blogs,
         "sec": sec, "alarme": alarme, "claude": claude_urteil, "fehler": fehler,
         "verworfen": len(verworfen), "tokenpreise": zusatz.get("tokenpreise"),
+        "tokennutzung": zusatz.get("tokennutzung"),
     }
 
 
@@ -4200,6 +4480,7 @@ def bericht_schreiben(konfig, d, oeffnen, barometer_verlauf=None,
                       fuer_mail=False, nur_web=False):
     konfig["_verworfen"] = d.get("verworfen", 0)
     konfig["_tokenpreise"] = d.get("tokenpreise")
+    konfig["_tokennutzung"] = d.get("tokennutzung")
     archiv_name = datetime.now().strftime("%Y-%m-%d-%H%M.html")
     # Zwischenlaeufe schreiben keinen Archiveintrag. Wuerde die Startseite
     # trotzdem einen Dateinamen nennen, faende sich die Navigation nicht in

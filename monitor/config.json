@@ -516,7 +516,12 @@
       "vorquartal_umsatz_mrd": 81.6,
       "vorquartal_rechenzentrum_mrd": 75.2,
       "konsens_folgequartal_mrd": 103.1,
-      "hinweis": "Der Rechenzentrums-Konsens ist abgeleitet: 92 Prozent Anteil aus Q1 GJ2027 auf den Umsatzkonsens gerechnet, kein direkt veroeffentlichter Wert. Entscheidend fuer die These ist weniger das Quartal selbst als die Prognose fuer das Folgequartal: bleibt sie unter 103,1 Mrd., bricht die Wachstumserwartung."
+      "hinweis": "Der Rechenzentrums-Konsens ist abgeleitet: 92 Prozent Anteil aus Q1 GJ2027 auf den Umsatzkonsens gerechnet, kein direkt veroeffentlichter Wert. Entscheidend fuer die These ist weniger das Quartal selbst als die Prognose fuer das Folgequartal: bleibt sie unter 103,1 Mrd., bricht die Wachstumserwartung.",
+      "konsens_bruttomarge_prozent": 75.0,
+      "bruttomarge_gaap_prozent": 74.9,
+      "betriebsaufwand_mrd": 8.3,
+      "einkaufsverpflichtungen_mrd": 145.0,
+      "worauf_achten": "Nicht nur Umsatz und Gewinn. Die Bruttomarge zeigt nachlassende Preissetzungsmacht ein bis zwei Quartale frueher als der Umsatz - das Unternehmen fuehrt 75,0 Prozent, jede Zahl darunter ohne erklaerende Sonderbelastung ist ein Warnzeichen FUER die These. Die Einkaufsverpflichtungen von zuletzt ueber 145 Milliarden zeigen, welche Nachfrage Nvidia selbst unterstellt: Werden sie abgeschrieben oder gekuerzt, hat das Unternehmen die eigene Prognose aufgegeben. Eine Abschreibung auf Vorraete waere das deutlichste Einzelsignal ueberhaupt."
     },
     "hyperscaler_capex": {
       "bezeichnung": "Investitionen der vier grossen Cloud-Anbieter",
@@ -532,6 +537,41 @@
       "vorjahr_wachstum_prozent": 87,
       "vorquartal_wachstum_prozent": 27,
       "hinweis": "Die Gegenprobe zur These: Solange diese Summe steigt, fliesst das Geld weiter. Erst wenn das Wachstum kippt - Rueckgang gegenueber dem Vorquartal oder eine gesenkte Jahresprognose -, bricht die Nachfrageseite weg, auf die die Position setzt. Derzeit +87 Prozent zum Vorjahr, also klar GEGEN die These."
+    },
+    "vertiv_auftraege": {
+      "bezeichnung": "Vertiv Auftragslage",
+      "stand": "2026-07-29",
+      "quelle": "Vertiv Q2-2026-Ergebnispraesentation, eigene Durchsicht am 21.08.2026",
+      "offengelegt": false,
+      "befund": "Vertiv hat in der Q2-2026-Mitteilung WEDER Auftragseingang NOCH Book-to-Bill NOCH Auftragsbestand als Zahl genannt. In der Praesentation stehen dazu nur Formulierungen wie 'strong pipeline momentum', 'expected robust orders growth' und 'strong backlog' - ohne eine einzige Ziffer. In Q4 2025 wurden noch +252 Prozent Auftragseingang und ein Book-to-Bill von rund 2,9 veroeffentlicht.",
+      "warum_es_zaehlt": "Die Vertiv-Position ist eine Wette darauf, dass keine Rechenzentren mehr gebaut werden. Das zeigt sich im Auftragseingang, nicht im Umsatz, der zwei bis drei Quartale nachlaeuft. Dass die Kennzahl genau dann verschwindet, wenn sie sich der Wende naehern muesste, ist selbst ein Befund - veroeffentlicht wurde sie, solange sie gut aussah.",
+      "letzte_bekannte": {
+        "quartal": "Q4 2025",
+        "auftragseingang_wachstum_prozent": 252,
+        "book_to_bill": 2.9,
+        "auftragsbestand_mrd": 15.0,
+        "auftragsbestand_stand": "Eingang Q2 2026"
+      },
+      "q2_2026": {
+        "umsatz_mrd": 3.274,
+        "konsens_umsatz_mrd": 3.38,
+        "umsatz_verfehlt": true,
+        "umsatz_wachstum_prozent": 24,
+        "organisch_prozent": 18,
+        "betriebsmarge_prozent": 22.6,
+        "betriebsmarge_veraenderung_bp": 410,
+        "betriebsgewinn_mio": 738,
+        "kursreaktion_prozent": -17
+      },
+      "jahresprognose_2026": {
+        "umsatz_mrd_mitte": 14.0,
+        "organisch_wachstum_prozent": 31,
+        "gewinn_je_aktie": 6.7,
+        "betriebsmarge_prozent": 23.8,
+        "freier_mittelzufluss_mio": 2500
+      },
+      "naechster_termin": "2026-10-28",
+      "worauf_achten": "Kommt die Zahl zurueck oder bleibt sie weg? Bleibt sie weg, ist das ein Signal fuer sich. Kommt sie zurueck: Book-to-Bill unter 1 bedeutet, der Auftragsbestand schrumpft - das frueheste harte Signal fuer die These."
     }
   }
 }

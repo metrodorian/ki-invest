@@ -1,0 +1,80 @@
+[
+  {
+    "datum": "2026-08-21",
+    "anteil_china_prozent": 73.69,
+    "summe_billionen": 52.9,
+    "china_billionen": 38.98,
+    "anbieter": {
+      "deepseek": 18.57,
+      "tencent": 9.22,
+      "xiaomi": 6.92,
+      "openai": 5.6,
+      "z-ai": 4.27,
+      "nvidia": 3.75,
+      "anthropic": 2.57,
+      "google": 2.0
+    },
+    "modelle": [
+      {
+        "modell": "DeepSeek V4 Flash 0731",
+        "anbieter": "deepseek",
+        "billionen": 11.4,
+        "land": "CN"
+      },
+      {
+        "modell": "Hy3",
+        "anbieter": "tencent",
+        "billionen": 9.22,
+        "land": "CN"
+      },
+      {
+        "modell": "MiMo-V2.5",
+        "anbieter": "xiaomi",
+        "billionen": 6.92,
+        "land": "CN"
+      },
+      {
+        "modell": "GPT-5.6 Luna",
+        "anbieter": "openai",
+        "billionen": 5.6,
+        "land": "US"
+      },
+      {
+        "modell": "DeepSeek V4 Flash 0423",
+        "anbieter": "deepseek",
+        "billionen": 5.06,
+        "land": "CN"
+      },
+      {
+        "modell": "GLM 5.2",
+        "anbieter": "z-ai",
+        "billionen": 4.27,
+        "land": "CN"
+      },
+      {
+        "modell": "Nemotron 3 Ultra (free)",
+        "anbieter": "nvidia",
+        "billionen": 3.75,
+        "land": "US"
+      },
+      {
+        "modell": "Claude Opus 5",
+        "anbieter": "anthropic",
+        "billionen": 2.57,
+        "land": "US"
+      },
+      {
+        "modell": "DeepSeek V4 Pro 0423",
+        "anbieter": "deepseek",
+        "billionen": 2.11,
+        "land": "CN"
+      },
+      {
+        "modell": "Gemini 3.6 Flash",
+        "anbieter": "google",
+        "billionen": 2.0,
+        "land": "US"
+      }
+    ]
+  }
+]
