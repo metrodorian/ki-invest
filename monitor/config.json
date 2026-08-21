@@ -536,7 +536,42 @@
       "vorquartal_mrd": 130.6,
       "vorjahr_wachstum_prozent": 87,
       "vorquartal_wachstum_prozent": 27,
-      "hinweis": "Die Gegenprobe zur These: Solange diese Summe steigt, fliesst das Geld weiter. Erst wenn das Wachstum kippt - Rueckgang gegenueber dem Vorquartal oder eine gesenkte Jahresprognose -, bricht die Nachfrageseite weg, auf die die Position setzt. Derzeit +87 Prozent zum Vorjahr, also klar GEGEN die These."
+      "hinweis": "Die Gegenprobe zur These: Solange diese Summe steigt, fliesst das Geld weiter. Erst ein Rueckgang gegenueber dem Vorquartal oder eine gesenkte Jahresprognose bricht die Nachfrageseite weg, auf die die Position setzt. Derzeit +87 Prozent zum Vorjahr, also klar GEGEN die These.",
+      "einheit": "Milliarden USD",
+      "hinweis_quartal": "Das sind die Investitionen JE QUARTAL, nicht kumuliert. Microsoft bilanziert auf ein Juni-Geschaeftsjahr, seine Quartale sind gegenueber dem Kalender verschoben; die Werte sind hier den Kalenderquartalen zugeordnet.",
+      "verlauf": [
+        {
+          "quartal": "Q1 2026",
+          "Amazon": 44.2,
+          "Alphabet": 35.67,
+          "Microsoft": 30.88,
+          "Meta": 19.85,
+          "summe": 130.6,
+          "meta_abgeleitet": true
+        },
+        {
+          "quartal": "Q2 2026",
+          "Amazon": 54.21,
+          "Alphabet": 44.92,
+          "Microsoft": 35.8,
+          "Meta": 31.08,
+          "summe": 166.0
+        }
+      ],
+      "halbjahr_2026": 296.6,
+      "ist_2025": 410.0,
+      "prognose_2026": {
+        "Amazon": 200.0,
+        "Microsoft": 190.0,
+        "Alphabet": 180.0,
+        "Meta": 135.0,
+        "summe": 705.0,
+        "spannen": {
+          "Alphabet": "175-185",
+          "Meta": "125-145 (angehoben von 115-135)"
+        }
+      },
+      "pruefbare_aussage": "Im ersten Halbjahr sind 296,6 Milliarden geflossen. Um die Jahresprognose von rund 705 Milliarden zu erreichen, muessten im zweiten Halbjahr etwa 408 Milliarden folgen - also gut 38 Prozent mehr als im ersten. Bleibt diese Beschleunigung aus, muss die Prognose gekuerzt werden, und genau das waere das Signal, auf das die Position wartet. Beobachte deshalb nicht die Hoehe, sondern ob die Quartalswerte dem noetigen Pfad folgen."
     },
     "vertiv_auftraege": {
       "bezeichnung": "Vertiv Auftragslage",

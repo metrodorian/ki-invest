@@ -484,18 +484,34 @@ def kennzahlen_text(konfig):
                v.get("naechster_termin", "?"), v.get("worauf_achten", "")))
 
     if h:
-        einzeln = h.get("einzeln") or {}
+        firmen = ("Amazon", "Alphabet", "Microsoft", "Meta")
+        prog = h.get("prognose_2026") or {}
+        zeilen_q = []
+        for q in h.get("verlauf", []):
+            zeilen_q.append("      %-9s %s  Summe %6.1f"
+                            % (q.get("quartal", "?"),
+                               "  ".join("%s %5.1f" % (f[:4], q.get(f, 0))
+                                         for f in firmen),
+                               q.get("summe", 0)))
         teile.append(
-            "  %s, %s: %.1f Mrd USD (%s)\n"
-            "    Vorquartal %.1f Mrd, Wachstum +%d%% zum Vorjahr, +%d%% zum Vorquartal\n"
-            "    Solange diese Summe steigt, arbeitet sie GEGEN die These. Erst ein "
-            "Rueckgang\n    oder eine gesenkte Jahresprognose bricht die Nachfrageseite."
-            % (h.get("bezeichnung", "Cloud-Investitionen"), h.get("quartal", "?"),
-               h.get("summe_mrd", 0),
-               ", ".join("%s %.1f" % (a, v) for a, v in
-                         sorted(einzeln.items(), key=lambda x: -x[1])),
-               h.get("vorquartal_mrd", 0), h.get("vorjahr_wachstum_prozent", 0),
-               h.get("vorquartal_wachstum_prozent", 0)))
+            "  %s, je Quartal in Milliarden USD (NICHT kumuliert):\n%s\n"
+            "      %-9s %s  Summe %6.1f\n"
+            "      %-9s %s  Summe %6.1f\n"
+            "    Ist 2025: %.0f Mrd. Wachstum zuletzt +%d%% zum Vorjahr, +%d%% zum "
+            "Vorquartal.\n"
+            "    PRUEFBARE AUSSAGE: %s\n"
+            "    %s"
+            % (h.get("bezeichnung", "Cloud-Investitionen"), "\n".join(zeilen_q),
+               "H1 2026",
+               "  ".join("%s %5.1f" % (f[:4], sum(q.get(f, 0) for q in h.get("verlauf", [])))
+                         for f in firmen),
+               h.get("halbjahr_2026", 0),
+               "Prog. 26",
+               "  ".join("%s %5.1f" % (f[:4], prog.get(f, 0)) for f in firmen),
+               prog.get("summe", 0),
+               h.get("ist_2025", 0), h.get("vorjahr_wachstum_prozent", 0),
+               h.get("vorquartal_wachstum_prozent", 0),
+               h.get("pruefbare_aussage", ""), h.get("hinweis", "")))
     return "\n\n".join(teile) or "  (keine Erwartungswerte hinterlegt)"
 
 
@@ -3322,23 +3338,46 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                         html_schuetzen(v.get("naechster_termin", "?"))))
 
         if h:
-            einzeln = h.get("einzeln") or {}
-            t.append('<div class="karte"><b>%s &middot; %s</b>'
-                     '<div class="tabelle" style="margin-top:6px"><table>'
+            firmen = ("Amazon", "Alphabet", "Microsoft", "Meta")
+            prog = h.get("prognose_2026") or {}
+            verlauf = h.get("verlauf") or []
+            t.append('<div class="karte"><b>%s</b>'
+                     '<div class="klein" style="margin:6px 0">%s</div>'
+                     '<div class="tabelle"><table><tr><th>Zeitraum</th>%s'
+                     '<th class="z">Summe</th></tr>'
                      % (html_schuetzen(h.get("bezeichnung", "")),
-                        html_schuetzen(h.get("quartal", ""))))
-            for anb, v in sorted(einzeln.items(), key=lambda x: -x[1]):
-                t.append('<tr><td>%s</td><td class="z">%.2f Mrd</td></tr>'
-                         % (html_schuetzen(anb), v))
-            t.append('<tr style="background:rgba(120,160,255,.10)"><td><b>Summe</b></td>'
-                     '<td class="z"><b>%.1f Mrd USD</b></td></tr>'
-                     '<tr><td>Vorquartal</td><td class="z">%.1f Mrd</td></tr>'
-                     '<tr><td>Wachstum</td><td class="z">+%d%% Jahr, +%d%% Quartal</td></tr>'
-                     '</table></div><div class="klein" style="margin-top:6px">%s</div></div>'
-                     % (h.get("summe_mrd", 0), h.get("vorquartal_mrd", 0),
-                        h.get("vorjahr_wachstum_prozent", 0),
-                        h.get("vorquartal_wachstum_prozent", 0),
+                        html_schuetzen(h.get("hinweis_quartal", "")),
+                        "".join('<th class="z">%s</th>' % f for f in firmen)))
+            for q in verlauf:
+                t.append('<tr><td>%s</td>%s<td class="z"><b>%.1f</b></td></tr>'
+                         % (html_schuetzen(q.get("quartal", "?")),
+                            "".join('<td class="z">%.1f</td>' % q.get(f, 0)
+                                    for f in firmen),
+                            q.get("summe", 0)))
+            if verlauf:
+                t.append('<tr style="background:rgba(120,160,255,.07)">'
+                         '<td><b>Halbjahr 2026</b></td>%s'
+                         '<td class="z"><b>%.1f</b></td></tr>'
+                         % ("".join('<td class="z">%.1f</td>'
+                                    % sum(q.get(f, 0) for q in verlauf)
+                                    for f in firmen),
+                            h.get("halbjahr_2026", 0)))
+            t.append('<tr style="background:rgba(120,160,255,.10)">'
+                     '<td><b>Prognose 2026</b></td>%s'
+                     '<td class="z"><b>%.0f</b></td></tr>'
+                     '<tr><td>Ist 2025</td>%s<td class="z">%.0f</td></tr>'
+                     '</table></div>'
+                     % ("".join('<td class="z">%.0f</td>' % prog.get(f, 0)
+                                for f in firmen),
+                        prog.get("summe", 0),
+                        "".join('<td class="z">&ndash;</td>' for _ in firmen),
+                        h.get("ist_2025", 0)))
+            t.append('<div class="klein" style="margin-top:6px">'
+                     '<b>Pr&uuml;fbare Aussage:</b> %s</div>'
+                     '<div class="klein" style="margin-top:6px">%s</div></div>'
+                     % (html_schuetzen(h.get("pruefbare_aussage", "")),
                         html_schuetzen(h.get("hinweis", ""))))
+
         t.append('<div class="klein">Quelle: %s</div>'
                  % html_schuetzen(kz.get("quelle", "?")))
 
