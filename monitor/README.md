@@ -215,9 +215,17 @@ Der Monitor läuft auf dem Raspberry Pi (OMV) unter `~/ki-invest`, gesteuert
 
 | Wann | Was |
 |---|---|
-| werktags 15:45, 17:45, 19:45, 21:45 | Prüflauf; bei echten Alarmen fragt er Claude nach Eilbedarf |
-| werktags 22:30 | Bericht mit Mail an l.duncker@posteo.de |
-| beim Systemstart | Webserver auf Port 8088 |
+| alle 10 Minuten, rund um die Uhr | Prüflauf ohne Claude; feste Alarmschwellen greifen sofort |
+| alle 3 Stunden (0, 3, 6 … 21 Uhr) | Prüflauf mit Claude-Einordnung |
+| werktags 22:30 | Tagesbericht mit Mail an l.duncker@posteo.de |
+| beim Systemstart | Webserver auf Port 8088, Telegram-Bot |
+
+Rund um die Uhr, weil die **Hongkonger Sitzung von 03:30 bis 10:00** unserer
+Zeit läuft — dort handeln Alibaba, Tencent und SenseTime, also der Kern der
+China-These. Ein Plan von 7 bis 23 Uhr hätte sie komplett übersehen. Geweckt
+wird dabei niemand: Für Lampe und Telegram gilt die Nachtruhe von 22 bis 7 Uhr
+mit einem Budget von 300 Sekunden, sodass nachts nur durchkommt, was ein
+Wecken wert ist.
 
 **Bericht im Browser:** http://192.168.178.20:8088/ — mit Archiv, Blättern über
 Pfeiltasten oder Knöpfe, dem roten Balken zum Abstellen eines Alarms und einer
