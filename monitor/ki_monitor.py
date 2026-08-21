@@ -44,6 +44,7 @@ STATE_PFAD = os.path.join(BASIS, "state.json")
 DATEN_PFAD = os.path.join(BASIS, "daten.json")
 CLAUDE_PFAD = os.path.join(BASIS, "claude.json")
 TOKEN_PFAD = os.path.join(BASIS, "tokenpreise.json")
+VERBESSERUNG_PFAD = os.path.join(BASIS, "verbesserungen.json")
 BERICHT_PFAD = os.path.join(BASIS, "bericht.html")
 LOG_PFAD = os.path.join(BASIS, "monitor.log")
 
@@ -4836,6 +4837,47 @@ def claude_sichern(urteil):
     ablage["_stand"] = datetime.now().strftime("%d.%m.%Y, %H:%M")
     ablage["_zeitstempel"] = datetime.now().isoformat(timespec="seconds")
     json_speichern(CLAUDE_PFAD, ablage)
+    verbesserung_merken(urteil)
+
+
+def verbesserung_merken(urteil):
+    """
+    Schreibt Claudes Vorschlaege mit, damit der woechentliche Verbesserungslauf
+    sie spaeter durchgehen kann.
+
+    Ohne diese Ablage waeren sie nach dem naechsten Lauf verloren: claude.json
+    wird jedes Mal ueberschrieben, und im Bericht steht nur der jeweils letzte
+    Stand. Doppelte Vorschlaege werden nicht erneut aufgenommen - Claude nennt
+    ueber Tage hinweg oft denselben Wunsch.
+    """
+    wuensche = urteil.get("datenwunsch") or []
+    uebersehen = (urteil.get("uebersehen") or "").strip()
+    if not wuensche and not uebersehen:
+        return
+
+    verlauf = json_laden(VERBESSERUNG_PFAD, [])
+    if not isinstance(verlauf, list):
+        verlauf = []
+    bekannt = {(e.get("text") or "")[:120] for e in verlauf}
+
+    jetzt = datetime.now().isoformat(timespec="seconds")
+    neu_dazu = 0
+    for w in wuensche:
+        text = w if isinstance(w, str) else json.dumps(w, ensure_ascii=False)
+        if text[:120] in bekannt:
+            continue
+        verlauf.append({"zeit": jetzt, "art": "datenwunsch", "text": text,
+                        "erledigt": False})
+        bekannt.add(text[:120])
+        neu_dazu += 1
+    if uebersehen and uebersehen[:120] not in bekannt:
+        verlauf.append({"zeit": jetzt, "art": "uebersehen", "text": uebersehen,
+                        "erledigt": False})
+        neu_dazu += 1
+
+    if neu_dazu:
+        json_speichern(VERBESSERUNG_PFAD, verlauf[-300:])
+        log_schreiben("%d neue Verbesserungsvorschlaege vermerkt" % neu_dazu)
 
 
 def claude_letzte():
