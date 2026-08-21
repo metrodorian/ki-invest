@@ -1,6 +1,10 @@
 monitor/state.json
 monitor/daten.json
 monitor/claude.json
+monitor/tokenpreise.json
+monitor/tokennutzung.json
+monitor/verbesserungen.json
+monitor/config.json.vor-*
 monitor/bericht.html
 monitor/web/
 monitor/*.log
