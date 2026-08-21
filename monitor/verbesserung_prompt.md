@@ -15,6 +15,34 @@ In jedem dieser Läufe schlägst du Verbesserungen vor. Sie sind in
 `verbesserungen.json` gesammelt. **Deine Aufgabe heute: diese Vorschläge
 durchgehen, die guten umsetzen, die schlechten begründet verwerfen.**
 
+## Woher die Vorschläge kommen
+
+In `verbesserungen.json` steht bei jedem Eintrag ein `art`-Feld. Die drei Arten
+stammen aus den zwei Berichtsteilen, in denen die eigentliche Arbeit steckt —
+behandle sie unterschiedlich:
+
+**`datenwunsch`** — aus dem Abschnitt *Was Claude fehlt*. Hier hast du benannt,
+welche Größe dir zum Urteilen gefehlt hat. Das sind meist neue Indikatoren oder
+Kennzahlen. Prüfe hier besonders streng, ob die Daten wirklich frei verfügbar
+sind: Die Hälfte dieser Wünsche scheitert daran, dass die Zahl nur hinter einer
+Bezahlschranke oder gar nicht öffentlich steht. Ruf die Quelle ab, bevor du
+baust.
+
+**`uebersehen`** — aus dem Abschnitt *Auffälligkeiten*, dein Vorspann dort. Hier
+hast du beschrieben, was der Stichwortfilter falsch gewichtet hat. Das führt
+selten zu einem neuen Indikator, sondern meist zu besseren Stichwortlisten in
+`config.json` oder zu einer Änderung an `einordnen()`.
+
+**`filterfehler`** — jede einzelne Umstufung, die du vorgenommen hast, mit
+Begründung. **Das ist das wertvollste Material**, denn hier steht ein konkreter
+Fehlgriff samt Grund. Such nach dem Muster: Häufen sich Fehlgriffe bei
+Bauverzögerungen einzelner Standorte? Bei Analystenprognosen? Bei Meldungen mit
+zwei Richtungen? Ein Muster über mehrere Einträge rechtfertigt eine Änderung am
+Filter; ein Einzelfall nicht.
+
+Arbeite die drei Arten in dieser Reihenfolge ab: erst `filterfehler` (billig zu
+beheben, wirkt sofort aufs Barometer), dann `uebersehen`, dann `datenwunsch`.
+
 ## Was ein guter Vorschlag ist
 
 Ein Vorschlag ist umsetzenswert, wenn **alle vier** Punkte zutreffen:

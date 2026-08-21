@@ -4850,9 +4850,16 @@ def verbesserung_merken(urteil):
     Stand. Doppelte Vorschlaege werden nicht erneut aufgenommen - Claude nennt
     ueber Tage hinweg oft denselben Wunsch.
     """
+    # Die beiden Berichtsteile, aus denen Verbesserungen kommen:
+    #   "Was Claude fehlt"  -> datenwunsch: welche Daten fehlen
+    #   "Auffaelligkeiten"  -> uebersehen: was der Stichwortfilter falsch wog,
+    #                          und umstufung: jede einzelne belegte Fehleinstufung
+    # Die Umstufungen sind das haerteste Material, denn sie benennen einen
+    # konkreten Fehlgriff samt Grund - daraus laesst sich der Filter verbessern.
     wuensche = urteil.get("datenwunsch") or []
     uebersehen = (urteil.get("uebersehen") or "").strip()
-    if not wuensche and not uebersehen:
+    umstufungen = urteil.get("umstufung") or []
+    if not wuensche and not uebersehen and not umstufungen:
         return
 
     verlauf = json_laden(VERBESSERUNG_PFAD, [])
@@ -4873,6 +4880,20 @@ def verbesserung_merken(urteil):
     if uebersehen and uebersehen[:120] not in bekannt:
         verlauf.append({"zeit": jetzt, "art": "uebersehen", "text": uebersehen,
                         "erledigt": False})
+        bekannt.add(uebersehen[:120])
+        neu_dazu += 1
+
+    for u in umstufungen:
+        if not isinstance(u, dict):
+            continue
+        text = ("Stichwortfilter lag falsch bei: %s -> %s. Grund: %s"
+                % ((u.get("titel") or "?")[:90], u.get("kategorie", "?"),
+                   (u.get("grund") or "")[:200]))
+        if text[:120] in bekannt:
+            continue
+        verlauf.append({"zeit": jetzt, "art": "filterfehler", "text": text,
+                        "erledigt": False})
+        bekannt.add(text[:120])
         neu_dazu += 1
 
     if neu_dazu:
