@@ -21,6 +21,8 @@
 #   probealarm            Meldekette testen (Lampe blinkt!)
 #   probealarm-aus        laufenden Alarm abstellen
 #   pruefen               Konfiguration auf Vollstaendigkeit pruefen
+#   verbesserung-zeigen   was der Sonntagslauf vorbereitet hat
+#   verbesserung-annehmen dessen Stand pushen und in den Betrieb uebernehmen
 #
 # Rollen: In config.lokal.json steht, wofuer der Rechner da ist.
 #   rolle = "betrieb"       ueberwacht, erzeugt Berichte, schickt Alarme (der Pi)
@@ -172,6 +174,55 @@ probealarm)
     nur_im_betrieb probealarm || exit 1
     echo "Loest die volle Meldekette aus - die Lampe blinkt, bis sie abgestellt wird."
     "$PYTHON" probealarm.py 2>&1 | tail -20
+    ;;
+
+verbesserung-zeigen)
+    ARBEIT="${KI_ARBEIT:-/home/Nutzer/ki-invest-arbeit}"
+    [ -d "$ARBEIT/.git" ] || { echo "Keine Arbeitskopie unter $ARBEIT."; exit 1; }
+    cd "$ARBEIT" || exit 1
+    echo "=== Was der Verbesserungslauf vorbereitet hat ==="
+    git log --oneline origin/main..HEAD 2>/dev/null || echo "(nichts Offenes)"
+    echo
+    git diff --stat origin/main..HEAD 2>/dev/null
+    echo
+    if [ -f monitor/VERBESSERUNG.md ]; then
+        echo "=== VERBESSERUNG.md ==="; cat monitor/VERBESSERUNG.md
+    elif [ -f VERBESSERUNG.md ]; then
+        echo "=== VERBESSERUNG.md ==="; cat VERBESSERUNG.md
+    fi
+    ;;
+
+verbesserung-annehmen)
+    nur_im_betrieb verbesserung-annehmen || exit 1
+    ARBEIT="${KI_ARBEIT:-/home/Nutzer/ki-invest-arbeit}"
+    [ -d "$ARBEIT/.git" ] || { echo "Keine Arbeitskopie unter $ARBEIT."; exit 1; }
+    cd "$ARBEIT" || exit 1
+    if [ -z "$(git log --oneline origin/main..HEAD 2>/dev/null)" ]; then
+        echo "Nichts anzunehmen."; exit 0
+    fi
+
+    echo "Pushe ..."
+    git push origin HEAD || { echo "Push fehlgeschlagen."; exit 1; }
+
+    # Sicherung, damit ein Fehler in einem Griff rueckgaengig ist.
+    SICHERUNG="$HIER/.vor-verbesserung"
+    rm -rf "$SICHERUNG"; mkdir -p "$SICHERUNG"
+    cp "$HIER"/*.py "$HIER"/*.sh "$HIER/config.json" "$SICHERUNG/" 2>/dev/null || true
+
+    cp "$ARBEIT"/monitor/*.py "$ARBEIT"/monitor/*.sh "$HIER/" 2>/dev/null
+    cp "$ARBEIT/monitor/config.json" "$HIER/config.json"
+    chmod +x "$HIER"/*.sh 2>/dev/null || true
+
+    echo "Pruefe im Betrieb ..."
+    if timeout 900 "$PYTHON" "$HIER/ki_monitor.py" --web --ohne-claude > /dev/null 2>&1; then
+        "$0" alles-neu --lokal
+        echo "Uebernommen und Dienste neu gestartet."
+    else
+        cp "$SICHERUNG"/* "$HIER/" 2>/dev/null
+        "$0" alles-neu --lokal
+        echo "FEHLGESCHLAGEN - alter Stand wiederhergestellt. Der Commit ist aber gepusht."
+        exit 1
+    fi
     ;;
 
 probealarm-aus)

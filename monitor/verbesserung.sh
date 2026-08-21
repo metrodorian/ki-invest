@@ -3,18 +3,19 @@
 # Woechentlicher Verbesserungslauf.
 #
 # Laesst claude ohne Rueckfrage die gesammelten Vorschlaege durchgehen und die
-# guten umsetzen. Danach wird geprueft, gepusht und erst dann in den laufenden
-# Betrieb uebernommen.
+# guten umsetzen. Das Ergebnis wird geprueft und committet - aber WEDER GEPUSHT
+# NOCH UEBERNOMMEN. Was eine unbeaufsichtigte Sitzung am Code aendert, soll ein
+# Mensch gesehen haben, bevor es oeffentlich wird oder den laufenden Monitor
+# steuert. Die Meldung darueber kommt per Telegram.
 #
-# Der wichtigste Gedanke dabei: claude arbeitet NICHT im laufenden Verzeichnis,
+# Angenommen wird spaeter von Hand:  ./betrieb.sh verbesserung-annehmen
+#
+# Der wichtigste Gedanke: claude arbeitet NICHT im laufenden Verzeichnis,
 # sondern in einem Git-Klon daneben. Der Monitor laeuft alle zehn Minuten - ein
 # halb bearbeitetes ki_monitor.py wuerde ihn mitten in der Arbeit zerreissen.
-# Uebernommen wird erst, was einen echten Testlauf ueberstanden hat; scheitert
-# er, bleibt der Betrieb unveraendert und es geht eine Meldung raus.
 #
 # Aufruf:  ./verbesserung.sh            regulaerer Lauf
-#          ./verbesserung.sh --trocken  alles bis zur Pruefung, ohne Push und
-#                                       ohne Uebernahme
+#          ./verbesserung.sh --trocken  alles bis zur Pruefung, ohne Commit
 
 set -u
 
@@ -153,8 +154,9 @@ if fehlt: sys.exit('Bericht unvollstaendig: ' + ', '.join(fehlt))
 print('  Testlauf erzeugt einen vollstaendigen Bericht (%.0f kB)' % (len(h)/1024))
 " || abbrechen "Bericht unvollstaendig"
 
+# Nur die Spuren des Testlaufs wegraeumen. Ein "git checkout -- monitor/" waere
+# hier fatal: Es wuerde alles verwerfen, was claude noch nicht committet hat.
 rm -f config.lokal.json bericht.html daten.json claude.json state.json
-git -C "$ARBEIT" checkout --quiet -- monitor/ 2>/dev/null || true
 
 if [ "$TROCKEN" = "1" ]; then
     notiz "Trockenlauf: nicht gepusht, nicht uebernommen."
@@ -162,7 +164,10 @@ if [ "$TROCKEN" = "1" ]; then
     exit 0
 fi
 
-# ---------------------------------------------------------- Sichern und Push
+# --------------------------------------------------------------- Sichern
+# Committet wird, gepusht NICHT. Was eine unbeaufsichtigte Sitzung an Code
+# aendert, soll ein Mensch gesehen haben, bevor es oeffentlich wird oder den
+# laufenden Monitor steuert. Der Commit liegt in der Arbeitskopie bereit.
 
 cd "$ARBEIT" || abbrechen "Arbeitskopie verschwunden"
 if [ -n "$(git status --porcelain)" ]; then
@@ -171,40 +176,21 @@ if [ -n "$(git status --porcelain)" ]; then
         -m "Automatisch erzeugt. Siehe VERBESSERUNG.md." || true
 fi
 NACH=$(git rev-parse HEAD)
-[ "$VOR" = "$NACH" ] && { notiz "Nichts committet."; exit 0; }
-
-git push --quiet origin HEAD || abbrechen "Push fehlgeschlagen (Stand $NACH liegt lokal vor)"
-notiz "Gepusht: $NACH"
-
-# ------------------------------------------------------------- Uebernehmen
-# Erst jetzt den Betrieb anfassen. Vorher eine Sicherung, damit ein Fehler,
-# den die Pruefung nicht gesehen hat, in einem Griff rueckgaengig ist.
-
-SICHERUNG="$LIVE/.vor-verbesserung"
-rm -rf "$SICHERUNG"; mkdir -p "$SICHERUNG"
-for datei in ki_monitor.py webserver.py telegram_bot.py hue_blink.py \
-             probealarm.py betrieb.sh config.json; do
-    cp "$LIVE/$datei" "$SICHERUNG/" 2>/dev/null || true
-done
-
-cp "$ARBEIT"/monitor/*.py "$ARBEIT"/monitor/*.sh "$LIVE/" 2>/dev/null
-cp "$ARBEIT/monitor/config.json" "$LIVE/config.json"
-chmod +x "$LIVE"/*.sh 2>/dev/null || true
-
-cd "$LIVE" || abbrechen "Betriebsordner nicht erreichbar"
-if ! timeout 900 "$PYTHON" ki_monitor.py --web --ohne-claude >> "$PROTOKOLL" 2>&1; then
-    notiz "Uebernahme fehlgeschlagen - stelle den alten Stand wieder her"
-    cp "$SICHERUNG"/* "$LIVE/" 2>/dev/null
-    ./betrieb.sh alles-neu --lokal >> "$PROTOKOLL" 2>&1
-    abbrechen "Der neue Stand lief im Betrieb nicht. Alter Stand wiederhergestellt, $NACH ist aber gepusht."
+if [ "$VOR" = "$NACH" ]; then
+    notiz "Nichts committet."
+    melden "🛠 <b>Verbesserungslauf</b>%0AGeprueft, nichts geaendert."
+    exit 0
 fi
 
-./betrieb.sh alles-neu --lokal >> "$PROTOKOLL" 2>&1
-notiz "Uebernommen und Dienste neu gestartet."
+notiz "Committet: $NACH (nicht gepusht, nicht uebernommen)"
 
-# Vorschlaege als erledigt zurueckschreiben, damit sie nicht erneut auflaufen.
+# Vorschlaege als behandelt zurueckschreiben, damit sie nicht erneut auflaufen.
 cp "$ARBEIT/monitor/verbesserungen.json" "$LIVE/" 2>/dev/null || true
 
-BERICHT=$(sed -n '1,60p' "$ARBEIT/VERBESSERUNG.md" 2>/dev/null | head -c 2500)
-melden "🛠 <b>Verbesserungslauf fertig</b>%0AStand <code>${NACH:0:7}</code> gepusht und uebernommen.%0A%0A$(echo "$BERICHT" | head -c 2000)"
-notiz "Fertig."
+BERICHT=$(sed -n '1,80p' "$ARBEIT/monitor/VERBESSERUNG.md" 2>/dev/null \
+          || sed -n '1,80p' "$ARBEIT/VERBESSERUNG.md" 2>/dev/null)
+ZUSAMMEN=$(echo "$BERICHT" | head -c 2200)
+
+melden "🛠 <b>Verbesserungslauf liegt zur Durchsicht</b>%0AStand <code>${NACH:0:7}</code> in der Arbeitskopie committet, <b>nicht gepusht</b> und noch nicht uebernommen.%0A%0A$ZUSAMMEN%0A%0AAnnehmen: <code>./betrieb.sh verbesserung-annehmen</code>"
+
+notiz "Fertig. Wartet auf Durchsicht."
