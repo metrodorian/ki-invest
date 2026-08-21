@@ -1049,12 +1049,23 @@ def barometer_rechnen(indikatoren, nachrichten):
     if vix:
         punkte.append((max(-1.0, min(1.0, (vix["wert"] - 0.92) / 0.15)), 1.0))
 
-    # Nachrichtenbilanz
-    fuer = sum(1 for n in nachrichten if n["kategorie"] == "these_bestaetigt")
-    gegen = sum(1 for n in nachrichten if n["kategorie"] == "these_gefaehrdet")
-    if fuer + gegen > 0:
+    # Nachrichtenbilanz. Nicht mitgezaehlt werden:
+    #   - doppeldeutige Meldungen (zwei Richtungen zugleich)
+    #   - Prognosen und Fuenfjahresschaetzungen (nachlaufend, in beide Richtungen)
+    # Und das Gewicht ist von 1,3 auf 0,9 gesenkt: Ausgezaehlte Schlagzeilen sind
+    # das weichste Material im Barometer, sie standen aber an erster Stelle.
+    zaehlbar = [n for n in nachrichten if not n.get("prognose")]
+    fuer = sum(1 for n in zaehlbar if n["kategorie"] == "these_bestaetigt")
+    gegen = sum(1 for n in zaehlbar if n["kategorie"] == "these_gefaehrdet")
+    if fuer + gegen >= 3:
+        # Unter drei zaehlbaren Meldungen ist die Bilanz Rauschen.
         bilanz = (fuer - gegen) / float(fuer + gegen)
-        punkte.append((bilanz, 1.3))
+        # Und auch darueber ist sie eine Stichprobe: Drei zufaellig eingesammelte
+        # Lokalmeldungen ueber einzelne Bauverzoegerungen sind kein Marktsignal.
+        # Deshalb zur Null hin daempfen, bis genug Material da ist - erst ab acht
+        # zaehlbaren Meldungen schlaegt die Bilanz voll durch.
+        bilanz *= min(1.0, (fuer + gegen) / 8.0)
+        punkte.append((bilanz, 0.9))
 
     if not punkte:
         return 50, "keine Daten"
@@ -1474,11 +1485,36 @@ def stichworte_finden(text, stichworte):
     return treffer
 
 
+# Woerter, an denen sich eine Vorhersage erkennen laesst. Eine verdoppelte
+# Fuenfjahresprognose eines Marktforschers ist ein NACHLAUFENDER Indikator: Sie
+# schreibt die Vergangenheit fort und misst keinen Auftragseingang. Solche
+# Meldungen zaehlen nicht in der Nachrichtenbilanz - in keine Richtung.
+PROGNOSE_WOERTER = (
+    "forecast", "forecasts", "projection", "projections", "projected",
+    "outlook", "estimates", "to reach", "by 2027", "by 2028", "by 2029",
+    "by 2030", "by 2035", "predicts", "predicted", "expects to", "seen rising",
+    "prognose", "prognostiziert", "erwartet bis", "schaetzt",
+)
+
+
+def ist_prognose(text):
+    unten = text.lower()
+    return any(w in unten for w in PROGNOSE_WOERTER)
+
+
 def einordnen(eintrag, fuer_these, gegen_these):
     grundlage = eintrag["titel"] + " " + eintrag.get("auszug", "")
     treffer_gegen = stichworte_finden(grundlage, gegen_these)
     treffer_fuer = stichworte_finden(grundlage, fuer_these)
-    if len(treffer_gegen) > len(treffer_fuer):
+
+    # Trifft eine Meldung auf beiden Seiten etwa gleich stark, hat sie zwei
+    # Richtungen und darf keiner zugeschlagen werden. Das Musterbeispiel ist
+    # Nvidias Restwertgarantie: als Nachfragesignal gegen die Position, als
+    # Signal fuer die Umsatzqualitaet dafuer.
+    if treffer_gegen and treffer_fuer and abs(len(treffer_gegen) - len(treffer_fuer)) <= 1:
+        eintrag["kategorie"] = "doppeldeutig"
+        eintrag["treffer"] = treffer_fuer + treffer_gegen
+    elif len(treffer_gegen) > len(treffer_fuer):
         eintrag["kategorie"] = "these_gefaehrdet"
         eintrag["treffer"] = treffer_gegen
     elif treffer_fuer:
@@ -1487,7 +1523,47 @@ def einordnen(eintrag, fuer_these, gegen_these):
     else:
         eintrag["kategorie"] = "neutral"
         eintrag["treffer"] = []
+
+    if eintrag["kategorie"] in ("these_bestaetigt", "these_gefaehrdet") \
+            and ist_prognose(grundlage):
+        eintrag["prognose"] = True
     return eintrag
+
+
+def claude_umstufungen_anwenden(nachrichten, urteil):
+    """
+    Wendet die Umstufungen an, die Claude im Feld "umstufung" zurueckmeldet.
+
+    Bisher stand seine Pruefung als Prosa im Bericht, waehrend das Barometer
+    weiter mit der Einstufung des Stichwortfilters rechnete - die Korrektur war
+    also folgenlos. Jetzt aendert sie die Bilanz.
+    """
+    if not urteil:
+        return 0
+    umstufungen = urteil.get("umstufung") or []
+    if not isinstance(umstufungen, list):
+        return 0
+
+    erlaubt = ("these_bestaetigt", "these_gefaehrdet", "doppeldeutig", "neutral")
+    geaendert = 0
+    for eintrag in umstufungen:
+        if not isinstance(eintrag, dict):
+            continue
+        suche = (eintrag.get("titel") or "").strip().lower()[:60]
+        neu_kat = eintrag.get("kategorie")
+        if not suche or neu_kat not in erlaubt:
+            continue
+        for n in nachrichten:
+            if suche in n["titel"].lower():
+                if n["kategorie"] != neu_kat:
+                    n["kategorie_vorher"] = n["kategorie"]
+                    n["kategorie"] = neu_kat
+                    n["umstufung_grund"] = (eintrag.get("grund") or "")[:300]
+                    geaendert += 1
+                break
+    if geaendert:
+        log_schreiben("Claude hat %d Meldungen umgestuft" % geaendert)
+    return geaendert
 
 
 # =========================================================== Claude-Einschaetzung
@@ -1650,11 +1726,29 @@ Formuliere die Eilmeldung selbst, knapp und in ganzen Saetzen. Du bestimmst
 Betreff, Schlagzeile und Aufbau; die Felder sind ein Geruest, kein Korsett.
 Nenne konkrete Zahlen statt Adjektive.
 
+DEINE UMSTUFUNGEN AENDERN DAS BAROMETER
+Das Feld "umstufung" ist nicht Prosa, sondern Steuerung: Was du dort eintraegst,
+wird auf die Nachrichtenbilanz angewendet, bevor das Barometer gerechnet wird.
+Nutze es, wo der Stichwortfilter danebenliegt. Vier Kategorien:
+- "these_bestaetigt" / "these_gefaehrdet": klare Richtung, falsch zugeordnet.
+- "doppeldeutig": die Meldung hat ZWEI Richtungen und darf keiner Seite
+  zugeschlagen werden. Beispiel: Nvidia garantiert Restwerte fuer Mietvertraege
+  seines groessten Abnehmers - als Nachfragesignal gegen die Position, als
+  Signal fuer die Umsatzqualitaet dafuer.
+- "neutral": kein Aussagewert, etwa eine wiederholte Altmeldung oder eine
+  Meldung ohne neuen Sachverhalt.
+Prognosen und Mehrjahresschaetzungen filtert das Skript bereits selbst heraus,
+die musst du nicht umstufen. Nur eintragen, was wirklich falsch liegt - eine
+leere Liste ist der Normalfall.
+
 Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
 {"zusammenfassung": ["Satz 1", "Satz 2", "Satz 3"],
  "these_status": "bestaetigt|neutral|gefaehrdet",
  "wichtigste_punkte": ["Punkt 1", "Punkt 2", "Punkt 3"],
  "uebersehen": "Was der Stichwortfilter falsch eingeordnet hat, oder leer",
+ "umstufung": [{"titel": "die ersten Worte der Schlagzeile, zum Wiederfinden",
+                "kategorie": "these_bestaetigt|these_gefaehrdet|doppeldeutig|neutral",
+                "grund": "ein Satz"}],
  "recherche": [{"frage": "Was wolltest du wissen",
                 "befund": "Was die Suche ergab, auch wenn sie nichts belegt",
                 "folgerung": "Was das fuer die These bedeutet",
@@ -1697,7 +1791,8 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zeilen(indikatoren, 12, lambda i: "  %s: %.2f %s" % (
             i["name"], i["wert"], i["einheit"])),
         zeilen(relevant, 25, lambda n: "  [%s] %s (%s)" % (
-            "GEGEN" if n["kategorie"] == "these_gefaehrdet" else "FUER",
+            "DOPPELDEUTIG" if n["kategorie"] == "doppeldeutig"
+            else "GEGEN" if n["kategorie"] == "these_gefaehrdet" else "FUER",
             n["titel"][:150], n.get("quelle", ""))),
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
@@ -3292,8 +3387,11 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  'dazugekommen sind.</div>' % neue_anzahl)
     relevant.sort(key=lambda n: (not n.get("neu"), n["kategorie"] != "these_gefaehrdet"))
     for n in relevant[:30]:
-        stufe = "alarm" if n["kategorie"] == "these_gefaehrdet" else "hinweis"
-        richtung = ("spricht <b>gegen</b> die These" if n["kategorie"] == "these_gefaehrdet"
+        stufe = ("warn" if n["kategorie"] == "doppeldeutig"
+                 else "alarm" if n["kategorie"] == "these_gefaehrdet" else "hinweis")
+        richtung = ("hat <b>zwei Richtungen</b> &ndash; zaehlt in keiner Bilanz"
+                    if n["kategorie"] == "doppeldeutig"
+                    else "spricht <b>gegen</b> die These" if n["kategorie"] == "these_gefaehrdet"
                     else "spricht <b>fuer</b> die These")
         if n.get("neu"):
             t.append('<div class="karte %s"><span class="neu">neu</span>'
@@ -3309,7 +3407,13 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                  '%s &middot; %s &middot; %s &middot; Stichworte: %s</div></div>'
                  % (stufe, html_schuetzen(n.get("link", "")),
                     html_schuetzen(n["titel"]), html_schuetzen(n.get("quelle", "")),
-                    html_schuetzen(n.get("thema", "")), richtung,
+                    html_schuetzen(n.get("thema", "")),
+                    richtung
+                    + (" &middot; <b>Prognose</b>, zaehlt nicht in der Bilanz"
+                       if n.get("prognose") else "")
+                    + (" &middot; von Claude umgestuft: %s"
+                       % html_schuetzen(n["umstufung_grund"])
+                       if n.get("umstufung_grund") else ""),
                     html_schuetzen(", ".join(n["treffer"]))))
 
     # ---- Erwartungswerte: die Messlatten
@@ -3791,6 +3895,19 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         claude_urteil = claude_fragen(konfig, positionen, indikatoren, barometer,
                                       nachrichten, regierung, blogs, sec,
                                       zusatz.get("tokenpreise"))
+
+    # Claudes Umstufungen anwenden und das Barometer damit neu rechnen. Nur so
+    # aendert seine Pruefung wirklich etwas - vorher stand sie als Prosa daneben.
+    if claude_urteil and not claude_urteil.get("fehler"):
+        if claude_umstufungen_anwenden(nachrichten, claude_urteil):
+            vorher = barometer[0]
+            barometer = barometer_rechnen(indikatoren, nachrichten)
+            if barometer[0] != vorher:
+                log_schreiben("Barometer nach Umstufung: %d statt %d"
+                              % (barometer[0], vorher))
+            zusammenfassung = zusammenfassung_bauen(
+                positionen, indikatoren, barometer, nachrichten, regierung, sec,
+                blogs, konfig, vorheriges_barometer)
 
     if mit_claude:
         if claude_urteil and not claude_urteil.get("fehler"):
@@ -4534,6 +4651,104 @@ def eilmeldung_verschicken(konfig, d, zustand):
     return True
 
 
+def bericht_telegram(konfig, d, voll=False):
+    """
+    Schickt den Stand nach Telegram: kurz nach jedem Claude-Lauf, vollstaendig
+    zum Tagesbericht.
+
+    Bisher hing Telegram nur an Eilmeldungen und am Bot-Befehl "bericht". Eine
+    Einordnung, die niemand abruft, hilft aber nicht - besonders nicht in den
+    Tagen um die Nvidia-Zahlen. Was geschickt wird, steuert der Block
+    "telegram.bericht" in der lokalen Auflage:
+
+        "nach_claude": true   nach jedem Claude-Lauf die Kurzfassung (leise)
+        "tagesbericht": true  zum Tagesbericht zusaetzlich die HTML-Datei
+
+    Die Kurzfassung nennt bewusst den IST-Wert der Scheine, nicht die Naeherung.
+    """
+    einst = (konfig.get("telegram") or {}).get("bericht") or {}
+    if not einst.get("nach_claude" if not voll else "tagesbericht", False):
+        return
+
+    wert, lage = d["barometer"][0], d["barometer"][1]
+    zeilen = ["%s <b>Bericht</b> &#183; Barometer <b>%d von 100</b>"
+              % ("\U0001F4C8" if wert >= 56 else
+                 "\U0001F4C9" if wert <= 44 else "\U0001F4CA", wert),
+              html_schuetzen(lage), ""]
+
+    for p in d.get("positionen", []):
+        ist = p.get("schein_ist_seit_einstieg")
+        gewinn = p.get("gewinn_eur")
+        zeilen.append("<b>%s</b> %s" % (
+            html_schuetzen(p["name"]),
+            ("%+.1f%% seit Einstieg, %.0f&nbsp;EUR (%+.0f)"
+             % (ist, p.get("wert_eur") or 0, gewinn or 0))
+            if ist is not None else "Scheinkurs unbekannt"))
+        zeilen.append("  Basiswert %.2f (%+.2f%%), Puffer %s, bis Stop %s" % (
+            p["kurs"], p["tag_prozent"],
+            ("%.0f%%" % p["barriere_abstand"])
+            if p.get("barriere_abstand") is not None else "?",
+            ("%.0f%%" % abs(p["abstand_verlustschwelle"]))
+            if p.get("abstand_verlustschwelle") is not None else "?"))
+    if d.get("positionen"):
+        gesamt = sum(p.get("gewinn_eur") or 0 for p in d["positionen"])
+        einsatz = sum((p.get("wert_eur") or 0) - (p.get("gewinn_eur") or 0)
+                      for p in d["positionen"])
+        if einsatz:
+            zeilen += ["", "Zusammen <b>%+.0f&nbsp;EUR</b> (%+.1f%%)"
+                       % (gesamt, gesamt / einsatz * 100)]
+
+    saetze = d.get("zusammenfassung") or []
+    if saetze:
+        zeilen += ["", "<b>Einordnung</b>"]
+        zeilen += [html_schuetzen(satz) for satz in saetze[:3]]
+
+    termin = naechster_termin_text(konfig)
+    if termin:
+        zeilen += ["", termin]
+
+    try:
+        telegram_senden(konfig, "\n".join(zeilen), still=not voll)
+
+        # Der vollstaendige Bericht geht als Datei mit, nicht als Verweis: Ein
+        # Link ins Heimnetz nuetzt unterwegs nichts, die Datei laesst sich ueberall
+        # oeffnen und bleibt im Verlauf stehen.
+        bericht = d.get("mail_html")
+        if not bericht:
+            try:
+                with open(BERICHT_PFAD) as f:
+                    bericht = f.read()
+            except IOError:
+                bericht = None
+        if bericht:
+            marke = datetime.now().strftime("%Y-%m-%d-%H%M")
+            telegram_datei(konfig, bericht, "bericht-%s.html" % marke,
+                           "Tagesbericht" if voll else "Vollstaendiger Bericht",
+                           still=True)
+    except Exception as fehler:                                  # noqa: BLE001
+        log_schreiben("Telegram-Bericht fehlgeschlagen: %s" % fehler)
+
+
+def naechster_termin_text(konfig):
+    """Der naechste anstehende Termin als einzeilige Erinnerung."""
+    heute = date.today()
+    kommend = []
+    for t in konfig.get("termine", []):
+        try:
+            tag = datetime.strptime(t["datum"], "%Y-%m-%d").date()
+        except (KeyError, ValueError):
+            continue
+        if tag >= heute:
+            kommend.append((tag, t.get("was", "")))
+    if not kommend:
+        return ""
+    tag, was = min(kommend)
+    tage = (tag - heute).days
+    return "\U0001F5D3 %s &#183; <b>%s</b>" % (
+        html_schuetzen(was),
+        "heute" if tage == 0 else ("morgen" if tage == 1 else "in %d Tagen" % tage))
+
+
 def bericht_mailen(konfig, d):
     """
     Schickt den Bericht als HTML-Mail. Nutzt den lokalen Mailserver, damit
@@ -4816,8 +5031,13 @@ def main():
             if not schwellen_alarm(konfig, d, zustand):
                 eilmeldung_verschicken(konfig, d, zustand)
             bericht_mailen(konfig, d)
+            bericht_telegram(konfig, d, voll=True)
             zustand["gemeldet"] = {"datum": date.today().isoformat(), "texte": []}
         if modus == "web":
+            # Nur wenn Claude tatsaechlich eine frische Einordnung geliefert hat -
+            # sonst kaeme achtmal am Tag dieselbe Nachricht.
+            if mit_claude and (d.get("claude") or {}).get("zusammenfassung"):
+                bericht_telegram(konfig, d, voll=False)
             zustand["letzter_lauf"] = datetime.now().isoformat(timespec="seconds")
             zustand["letztes_barometer"] = d["barometer"][0]
             json_speichern(STATE_PFAD, zustand)
