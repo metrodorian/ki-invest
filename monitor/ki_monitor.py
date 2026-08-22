@@ -553,7 +553,10 @@ def kennzahlen_text(konfig):
             "Marge %.1f%% (+%d Bp), Kurs %+d%%\n"
             "    Naechster Termin %s. %s"
             % (v.get("bezeichnung", "Vertiv"), v.get("stand", "?"),
-               v.get("befund", ""), v.get("warum_es_zaehlt", ""),
+               v.get("befund", ""), v.get("warum_es_zaehlt", "")
+               + ("\n    VORBEHALTE GEGEN DEN ERSATZ:\n"
+                  + "\n".join("      - " + x for x in v.get("ersatz_vorbehalte", []))
+                  if v.get("ersatz_vorbehalte") else ""),
                letzte.get("quartal", "?"),
                letzte.get("auftragseingang_wachstum_prozent", 0),
                letzte.get("book_to_bill", 0), letzte.get("auftragsbestand_mrd", 0),
@@ -1103,32 +1106,77 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
             "kurzwert": "%+.0f Bp im Monat" % monat_bp,
         })
 
-    # --- Dasselbe am unteren Ende der Bonitaetsskala
+    # --- B-Rating: dort sitzen die Neoclouds tatsaechlich
+    b_auf = zusatz.get("b_aufschlag") if zusatz else None
+    if b_auf:
+        b_bp = b_auf["jetzt"] * 100
+        b_monat = b_auf["monat"] * 100
+        ind.append({
+            "name": "Risikoaufschlag B",
+            "wert": b_bp,
+            "einheit": "Basispunkte (%+.0f Bp Monat)" % b_monat,
+            "erklaerung": "Die Bonitaetsstufe, in der die schuldenfinanzierten "
+                          "GPU-Vermieter tatsaechlich begeben - CoreWeave und "
+                          "aehnliche liegen im B-Bereich, nicht in CCC. "
+                          "<b>Dies ist damit der naeherliegende Messwert</b> fuer "
+                          "Finanzierungsstress bei den Rechenzentrumsbauern. "
+                          "Weitet er sich aus, wird ihre Refinanzierung teuer.",
+            "these": ("gut" if b_monat > 30
+                      else "schlecht" if b_monat < -30 else "neutral"),
+            "nachkomma": 0,
+            "veraenderung_monat": b_monat,
+            "vergleichswert": b_monat / 5.0,
+            "kurzwert": "%+.0f Bp im Monat" % b_monat,
+        })
+
+    # --- Streuung am unteren Ende der Bonitaetsskala
     ccc = zusatz.get("ccc_aufschlag") if zusatz else None
     if ccc:
         ccc_bp = ccc["jetzt"] * 100
         ccc_monat = ccc["monat"] * 100
         ccc_woche = ccc["woche"] * 100
-        verhaeltnis = (ccc["jetzt"] / aufschlag["jetzt"]) if aufschlag and aufschlag["jetzt"] else None
+        # Die Differenz zum Index statt des Verhaeltnisses: Bei einem Nenner nahe
+        # historischer Tiefs hebt schon eine Einengung um 20 Bp das Verhaeltnis
+        # spuerbar, ohne dass sich bei CCC etwas bewegt haette.
+        differenz = None
+        weitung = None
+        if aufschlag:
+            differenz = ccc_bp - aufschlag["jetzt"] * 100
+            weitung = ccc_monat - aufschlag["monat"] * 100
         ind.append({
-            "name": "Risikoaufschlag CCC und schlechter",
+            "name": "Streuung am unteren Ende",
             "wert": ccc_bp,
-            "einheit": "Basispunkte (%+.0f Bp Woche, %+.0f Bp Monat%s)"
-                       % (ccc_woche, ccc_monat,
-                          ", das %.1f-fache des Index" % verhaeltnis if verhaeltnis else ""),
-            "erklaerung": "Derselbe Messwert fuer die schwaechsten Schuldner. "
-                          "<b>Hier sitzt die gehebelte Rechenzentrumsfinanzierung</b> "
-                          "&ndash; der breite Index mittelt sie mit soliden "
-                          "Emittenten weg und kann ruhig aussehen, waehrend genau "
-                          "die Schuldner in Not geraten, auf die es ankommt. "
-                          "Steigt dieser Wert schneller als der Index, bricht die "
-                          "Finanzierung am unteren Ende zuerst.",
-            "these": ("gut" if ccc_monat > 50
-                      else "schlecht" if ccc_monat < -50 else "neutral"),
+            "einheit": ("Bp CCC und schlechter (%+.0f Woche, %+.0f Monat%s)"
+                        % (ccc_woche, ccc_monat,
+                           "; %.0f Bp ueber dem Index, im Monat %+.0f Bp geweitet"
+                           % (differenz, weitung) if differenz is not None else "")),
+            "erklaerung": "Was die schwaechsten Schuldner ueber den breiten "
+                          "Hochzinsmarkt hinaus zahlen. <b>Weitet sich die "
+                          "Differenz, geraet das untere Ende in Not, waehrend der "
+                          "Markt insgesamt ruhig aussieht</b> - die klassische "
+                          "Signatur eines beginnenden Kreditzyklus. "
+                          "<b>Vorsicht bei der Deutung:</b> Der CCC-Index ist ein "
+                          "Universum oeffentlich begebener Anleihen mit wenigen, "
+                          "marktwertgewichteten Emittenten und wird von "
+                          "Altlast-Sektoren gepraegt (Energie, Gesundheit, "
+                          "Telekom). <b>Die KI-Verschuldung liegt ueberwiegend "
+                          "woanders</b>: in Private Credit, das gar nicht bewertet "
+                          "wird, in Rechenzentrums-ABS mit meist erstklassigen "
+                          "Tranchen, in Anleihen der Hyperscaler und in "
+                          "Leveraged Loans. Dies misst also die Kreditbedingungen "
+                          "fuer schwache Schuldner allgemein, <b>nicht "
+                          "KI-Stress</b>. Eine einzelne grosse notleidende "
+                          "Kapitalstruktur kann den Wert allein bewegen.",
+            # Nur dann ein Signal FUER die These, wenn sich auch die Stufe darueber
+            # bewegt - sonst ist es eher ein Einzelfall im CCC-Universum.
+            "these": ("gut" if (weitung is not None and weitung > 30
+                                and b_auf and b_auf["monat"] * 100 > 15)
+                      else "neutral"),
             "nachkomma": 0,
             "veraenderung_monat": ccc_monat,
-            "vergleichswert": ccc_monat / 5.0,
-            "kurzwert": "%+.0f Bp im Monat" % ccc_monat,
+            "vergleichswert": (weitung or ccc_monat) / 5.0,
+            "kurzwert": ("Differenz %+.0f Bp im Monat" % weitung
+                         if weitung is not None else "%+.0f Bp im Monat" % ccc_monat),
         })
 
     # --- Preis je Million Token: der direkte Effizienzmesswert
@@ -1250,18 +1298,34 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                 "wert": jetzt_a["wert"] / 1e9,
                 "einheit": ("Mrd. USD Vertragsverbindlichkeiten (%+.0f%% seit %s)"
                             % (wandel, vorher_a["ende"])),
-                "erklaerung": "Was Kunden bereits gezahlt haben, ohne die Ware zu "
-                              "haben - der beste verbliebene Ersatz fuer den "
-                              "Auftragseingang, seit Vertiv den nicht mehr "
-                              "veroeffentlicht. Anders als der Umsatz laeuft er "
-                              "nicht nach. <b>Faellt der Posten gegenueber dem "
-                              "Vorquartal, versiegt der Zulauf</b> - das ist das "
-                              "frueheste harte Signal fuer die Vertiv-Position. "
-                              "<b>Vorbehalt:</b> nur der kurzfristige Teil, und "
-                              "Zukaeufe bringen fremde Bestaende mit, die wie "
-                              "eigenes Wachstum aussehen.",
-                "these": ("gut" if wandel < -15 else "schlecht" if wandel > 15
-                          else "neutral"),
+                "erklaerung": "Was Kunden gezahlt haben, ohne die Ware zu haben "
+                              "&ndash; der verbliebene Ersatz fuer den "
+                              "Auftragseingang, den Vertiv seit Februar 2026 "
+                              "angekuendigtermassen nicht mehr je Quartal meldet. "
+                              "<b>Er traegt weniger, als es aussieht.</b> Erstens "
+                              "ist er ein Bestand, nicht ein Fluss: Er faellt erst, "
+                              "wenn die Umsatzrealisierung den Zufluss ueberholt, "
+                              "also fruehestens nach einem vollen "
+                              "Auftrags-bis-Lieferung-Zyklus &ndash; bei zwoelf "
+                              "Monaten Auftragsdeckung <b>drei bis sechs "
+                              "Quartale</b>. Auf einem Horizont von Wochen kann er "
+                              "die These weder bestaetigen noch widerlegen. "
+                              "Zweitens erhoeht nicht ausgelieferte Ware bei "
+                              "kassiertem Geld den Posten: Der Q2-Umsatz verfehlte "
+                              "den Konsens wegen Lieferkettenstaus &ndash; "
+                              "steigende Anzahlungen und verfehlter Umsatz sind "
+                              "teilweise <b>dasselbe Ereignis in zwei "
+                              "Bilanzzeilen</b>. Drittens ist Vorauszahlung ein "
+                              "Rationierungsmittel: Laesst die Knappheit nach, "
+                              "faellt der Posten bei unveraendertem "
+                              "Auftragsvolumen. Ein Rueckgang waere dann das "
+                              "Gegenteil eines Nachfrageeinbruchs. Ausserdem nur "
+                              "der kurzfristige Teil, und Zukaeufe bringen fremde "
+                              "Bestaende mit.",
+                # Bewusst nur zur Kenntnis: Ein Quartalsbestand mit drei bekannten
+                # Stoerfaktoren darf das Barometer nicht in eine Richtung ziehen,
+                # waehrend daneben taegliche Marktpreise stehen.
+                "these": "neutral",
                 "nachkomma": 2,
                 "vergleichswert": wandel,
                 "kurzwert": "%s Mrd. USD, %+.0f%%"
@@ -3800,7 +3864,12 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                         q2.get("betriebsmarge_prozent", 0),
                         q2.get("betriebsmarge_veraenderung_bp", 0),
                         q2.get("kursreaktion_prozent", 0),
-                        html_schuetzen(v.get("warum_es_zaehlt", "")),
+                        html_schuetzen(v.get("warum_es_zaehlt", ""))
+                        + ("<div style='margin-top:6px'><b>Vorbehalte gegen den "
+                           "Ersatzindikator:</b><ul class='liste'>%s</ul></div>"
+                           % "".join("<li>%s</li>" % html_schuetzen(x)
+                                     for x in v.get("ersatz_vorbehalte", []))
+                           if v.get("ersatz_vorbehalte") else ""),
                         html_schuetzen(v.get("worauf_achten", "")),
                         html_schuetzen(v.get("naechster_termin", "?"))))
 
@@ -4190,6 +4259,20 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
         zusatz["bilanzreihen"] = bilanz
     else:
         fehler.append("Bilanzreihen (SEC XBRL) nicht abrufbar")
+
+    # Die B-Reihe ist fuer diese These die naeherliegende: Neocloud-Emittenten
+    # sind typischerweise B, nicht CCC. Ohne sie liesse sich nicht unterscheiden,
+    # ob eine Ausweitung die ganze Bonitaetsskala erfasst oder nur das unterste
+    # Ende, wo ueberwiegend Altlasten aus Energie, Telekom und Gesundheit liegen.
+    reihe_b = fred_reihe(kennung, reihe="BAMLH0A2HYB")
+    if len(reihe_b) > 25:
+        jetzt = reihe_b[-1][1]
+        zusatz["b_aufschlag"] = {
+            "jetzt": jetzt,
+            "woche": jetzt - reihe_b[-6][1],
+            "monat": jetzt - reihe_b[-22][1],
+            "stand": reihe_b[-1][0],
+        }
 
     reihe_ccc = fred_reihe(kennung, reihe="BAMLH0A3HYC")
     if len(reihe_ccc) > 25:
