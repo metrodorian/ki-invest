@@ -613,8 +613,8 @@
       "stand": "2026-07-29",
       "quelle": "Vertiv Q2-2026-Ergebnispraesentation, eigene Durchsicht am 21.08.2026",
       "offengelegt": false,
-      "befund": "Vertiv hat in der Q2-2026-Mitteilung WEDER Auftragseingang NOCH Book-to-Bill NOCH Auftragsbestand als Zahl genannt. In der Praesentation stehen dazu nur Formulierungen wie 'strong pipeline momentum', 'expected robust orders growth' und 'strong backlog' - ohne eine einzige Ziffer. In Q4 2025 wurden noch +252 Prozent Auftragseingang und ein Book-to-Bill von rund 2,9 veroeffentlicht.",
-      "warum_es_zaehlt": "Die Vertiv-Position ist eine Wette darauf, dass keine Rechenzentren mehr gebaut werden. Das zeigt sich im Auftragseingang, nicht im Umsatz, der zwei bis drei Quartale nachlaeuft. Dass die Kennzahl genau dann verschwindet, wenn sie sich der Wende naehern muesste, ist selbst ein Befund - veroeffentlicht wurde sie, solange sie gut aussah.",
+      "befund": "Vertiv nennt seit dem ersten Quartal 2026 weder Auftragseingang noch Book-to-Bill noch Auftragsbestand je Quartal. Das wurde am 11.02.2026 auf dem Q4-Call ANGEKUENDIGT - begruendet mit zu hoher Schwankung, die die Leistung verzerre - und zwar im Quartal mit den besten Zahlen der Firmengeschichte (+252 Prozent Auftragseingang, 15 Mrd. Auftragsbestand). Die Jahresangabe im 10-K bleibt. Es ist also angekuendigte Politik, KEIN Verstecken schlechter Zahlen. Es entzieht uns aber die einzige Kennzahl, die die Frage entscheiden wuerde.",
+      "warum_es_zaehlt": "Die Vertiv-Position ist eine Wette darauf, dass keine Rechenzentren mehr gebaut werden. Das zeigt sich im Auftragseingang, nicht im Umsatz, der zwei bis drei Quartale nachlaeuft. Weil die Zahl fehlt, muss ein Ersatz herhalten - und der traegt weniger, als es zunaechst aussieht.",
       "letzte_bekannte": {
         "quartal": "Q4 2025",
         "auftragseingang_wachstum_prozent": 252,
@@ -641,7 +641,7 @@
         "freier_mittelzufluss_mio": 2500
       },
       "naechster_termin": "2026-10-28",
-      "worauf_achten": "Kommt die Zahl zurueck oder bleibt sie weg? Bleibt sie weg, ist das ein Signal fuer sich. Kommt sie zurueck: Book-to-Bill unter 1 bedeutet, der Auftragsbestand schrumpft - das frueheste harte Signal fuer die These.",
+      "worauf_achten": "Als koinzidenter Gegentest taugen eher: die sequenzielle Veraenderung der Anzahlungen im Verhaeltnis zum erwarteten Jahresumsatz, Angaben zu Stornierungen und Vertragsaenderungen, sowie Lieferzeiten und Auftragslage bei Eaton und Schneider. Der naechste Quartalsbericht kommt am 28.10.2026 - lange nach dem Zeitlimit dieser Position.",
       "ersatzindikator": {
         "bezeichnung": "Erhaltene Anzahlungen (Vertragsverbindlichkeiten, kurzfristig)",
         "quelle": "SEC XBRL, us-gaap:ContractWithCustomerLiabilityCurrent, CIK 1674101",
@@ -656,7 +656,14 @@
           "2026-06-30": 3.634
         },
         "befund": "Der Posten hat sich binnen zwei Quartalen verdoppelt. Das spricht klar GEGEN die These: Kunden zahlen weiter im Voraus. Ein Rueckgang waere das erste harte Gegensignal, das der Umsatz erst zwei bis drei Quartale spaeter zeigen wuerde."
-      }
+      },
+      "offenlegung_eingestellt_am": "2026-02-11",
+      "ersatz_vorbehalte": [
+        "BESTAND, NICHT FLUSS: Erhaltene Anzahlungen sind das Integral aus neuen Vorauszahlungen minus Umsatzrealisierung. Sie fallen erst, wenn die Realisierung den Zufluss ueberholt, also fruehestens nach einem vollen Auftrags-bis-Lieferung-Zyklus. Bei rund 15 Mrd. Auftragsbestand gegen rund 14 Mrd. Jahresumsatz sind das etwa zwoelf Monate Deckung: Ein Wendepunkt im Auftragseingang von heute zeigt sich hier erst in drei bis sechs Quartalen. AUF EINEM HORIZONT VON WOCHEN KANN DIESE ZAHL DIE THESE WEDER BESTAETIGEN NOCH WIDERLEGEN.",
+        "SPIEGELBILD DES AUSFUEHRUNGSPROBLEMS: Der Q2-Umsatz verfehlte den Konsens (3,274 gegen 3,38 Mrd.), begruendet mit Lieferkettenstaus und Projekt-Timing. Nicht ausgelieferte Ware bei bereits kassiertem Geld ERHOEHT die Anzahlungen. Steigende Anzahlungen bei verfehltem Umsatz sind also teilweise dasselbe Ereignis in zwei Bilanzzeilen, kein zusaetzliches Nachfragesignal.",
+        "RATIONIERUNGSINSTRUMENT: Vorauszahlungsquoten steigen, wenn Kapazitaet knapp ist - Kunden sichern sich Slots. Entspannt sich die Knappheit, faellt der Posten bei UNVERAENDERTEM Auftragsvolumen. Ein Rueckgang waere dann kein Nachfrageeinbruch, sondern das Gegenteil von Knappheit.",
+        "ZEITSIGNATUR: Preisluecke und Kreditaufschlaege sind vorwaertsgerichtete Marktpreise mit Tagesaufloesung, dieser Posten ist ein rueckwaertsgerichteter Bilanzbestand mit Quartalsaufloesung. Sie gehoeren nicht in denselben Satz."
+      ]
     },
     "uebernahme_reibung": {
       "bezeichnung": "Reibung zwischen Preisvorteil und tatsaechlichem Wechsel",
