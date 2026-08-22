@@ -25,6 +25,7 @@ claude-Kommandozeilenwerkzeug fuer die Interpretation.
 import json
 import os
 import re
+import shutil
 import ssl
 import subprocess
 import sys
@@ -1839,6 +1840,29 @@ def claude_umstufungen_anwenden(nachrichten, urteil):
 
 # =========================================================== Claude-Einschaetzung
 
+def claude_befehl_finden(name="claude"):
+    """
+    Sucht das claude-Kommando auch dann, wenn es nicht im Suchpfad steht.
+
+    Cron setzt den Pfad fuer seine Claude-Laeufe ausdruecklich, der
+    Telegram-Bot und der Webserver starten aber ueber @reboot ohne ihn. Ein von
+    dort angestossener Bericht fand claude nicht und fiel wortlos auf die
+    vorherige Einordnung zurueck - er sah aus wie ein Lauf mit Claude, war aber
+    keiner.
+    """
+    if os.path.sep in name:
+        return name
+    gefunden = shutil.which(name)
+    if gefunden:
+        return gefunden
+    for ort in (os.path.expanduser("~/.local/node/bin"),
+                "/opt/homebrew/bin", "/usr/local/bin"):
+        pfad = os.path.join(ort, name)
+        if os.path.isfile(pfad) and os.access(pfad, os.X_OK):
+            return pfad
+    return name
+
+
 def claude_fragen(konfig, positionen, indikatoren, barometer, nachrichten,
                   regierung, blogs, sec, tokenpreise=None):
     """
@@ -1849,7 +1873,7 @@ def claude_fragen(konfig, positionen, indikatoren, barometer, nachrichten,
     if not einst.get("aktiv", True):
         return None
 
-    befehl_name = einst.get("befehl", "claude")
+    befehl_name = claude_befehl_finden(einst.get("befehl", "claude"))
 
     def zeilen(liste, anzahl, form):
         return "\n".join(form(x) for x in liste[:anzahl]) or "  (nichts)"
