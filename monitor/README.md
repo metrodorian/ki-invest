@@ -221,7 +221,7 @@ Der Monitor läuft auf dem Raspberry Pi (OMV) unter `~/ki-invest`, gesteuert
 | Wann | Was |
 |---|---|
 | alle 10 Minuten, rund um die Uhr | Prüflauf ohne Claude; feste Alarmschwellen greifen sofort |
-| alle 3 Stunden (0, 3, 6 … 21 Uhr) | Prüflauf mit Claude-Einordnung |
+| 00:00 und 12:00 | Prüflauf mit Claude-Einordnung |
 | werktags 22:30 | Tagesbericht mit Mail an l.duncker@posteo.de |
 | beim Systemstart | Webserver auf Port 8088, Telegram-Bot |
 

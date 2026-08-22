@@ -8,7 +8,7 @@ Frage beantworten. Was du hinterlässt, läuft ab sofort automatisch weiter.
 
 Der Monitor beobachtet die These: *Die westlichen KI-Investitionen erzeugen
 kaum Gegenwert, während China mit günstigerer Hardware aufholt.* Er läuft alle
-zehn Minuten, fragt alle drei Stunden dich um eine Einordnung und schickt bei
+zehn Minuten, fragt dich zweimal am Tag um eine Einordnung und schickt bei
 Schwellenverletzungen Alarme über Mail, Telegram und eine Lampe.
 
 In jedem dieser Läufe schlägst du Verbesserungen vor. Sie sind in
