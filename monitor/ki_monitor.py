@@ -512,6 +512,23 @@ def zirkel_und_abschreibung_text(konfig):
                z.get("folgerung_fuer_die_position", ""),
                z.get("vorsicht_berichterstattung", "")))
 
+    vr = k.get("verfuegbarkeitsrisiko") or {}
+    if vr:
+        v = vr.get("vorfall") or {}
+        teile.append(
+            "VERFUEGBARKEITSRISIKO - der Uebernahmemechanismus, der die Reibung umgeht\n"
+            "  %s\n"
+            "  VORFALL %s: %s\n"
+            "  REAKTION: %s\n"
+            "  ENDE: %s\n"
+            "  WARUM ES ZAEHLT: %s\n"
+            "  EIGENES RISIKO: %s\n"
+            "  WORAUF ACHTEN: %s"
+            % (vr.get("kernsatz", ""), v.get("datum", "?"), v.get("hergang", ""),
+               v.get("reaktion", ""), v.get("ende", ""),
+               vr.get("warum_es_zaehlt", ""), vr.get("eigenes_risiko", ""),
+               vr.get("worauf_achten", "")))
+
     d = k.get("abschreibungsdauer") or {}
     if d.get("unternehmen"):
         teile.append(
@@ -729,6 +746,7 @@ def tokenpreise_auswerten(konfig):
         "jetzt": jetzt, "veraenderung": veraenderung, "vergleich": vergleich,
         "modelle": modelle, "liga_grenze": bestwert - 3,
         "stand": einst.get("stand"), "quelle": einst.get("quelle"),
+        "vorbehalt": einst.get("vorbehalt"),
         "hinweis": einst.get("hinweis"), "verlauf": verlauf[-30:],
     }
 
@@ -2089,6 +2107,7 @@ wert - und trag die Guete und den Preis danach in die Modelltabelle nach.
 %s
 
 Faehigkeit und Preis je Million Token - der direkte Effizienzmesswert.
+VORBEHALT ZUR GUETE: %s
 Nach Faehigkeit sortiert (Qualitaetswert 0-100), die faehigsten zuerst.
 Entscheidend ist nicht der billigste Preis, sondern der Preis bei GLEICHER
 Faehigkeit: Kostet ein chinesisches Modell auf demselben Qualitaetsrang einen
@@ -2261,6 +2280,7 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
         zirkel_und_abschreibung_text(konfig),
         kennzahlen_text(konfig),
         modell_releases_text(konfig),
+        (konfig.get("tokenpreise") or {}).get("vorbehalt", "keiner hinterlegt"),
         ((("\n".join("  Guete %3s  %-24s %-10s %s  %s USD Ausgabe%s"
                     % (m.get("faehigkeit", "?"), m["modell"], m["anbieter"],
                        m.get("land", ""),
@@ -3884,8 +3904,8 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
     kz0 = konfig.get("kennzahlen") or {}
     z = kz0.get("zirkelfinanzierung") or {}
     d = kz0.get("abschreibungsdauer") or {}
-    if z or d:
-        t.append("<h2>Zwei Einordnungen</h2>")
+    if z or d or kz0.get("verfuegbarkeitsrisiko"):
+        t.append("<h2>Einordnungen</h2>")
     if z:
         t.append('<div class="karte"><b>%s</b>'
                  '<div class="klein" style="margin:6px 0"><b>%s</b></div>'
@@ -3903,6 +3923,29 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                             for x in z.get("was_nicht_entlastet", [])),
                     html_schuetzen(z.get("folgerung_fuer_die_position", "")),
                     html_schuetzen(z.get("vorsicht_berichterstattung", ""))))
+    vr = kz0.get("verfuegbarkeitsrisiko") or {}
+    if vr:
+        v = vr.get("vorfall") or {}
+        t.append('<div class="karte warn"><b>%s</b>'
+                 '<div class="klein" style="margin:6px 0"><b>%s</b></div>'
+                 '<div class="klein"><b>%s:</b> %s</div>'
+                 '<div class="klein" style="margin-top:6px">%s</div>'
+                 '<div class="klein" style="margin-top:6px">%s</div>'
+                 '<div class="klein" style="margin-top:6px">%s</div>'
+                 '<div class="klein" style="margin-top:6px"><b>Auch fuer diesen '
+                 'Monitor:</b> %s</div>'
+                 '<div class="klein" style="margin-top:6px"><b>Worauf achten:</b> '
+                 '%s</div></div>'
+                 % (html_schuetzen(vr.get("bezeichnung", "")),
+                    html_schuetzen(vr.get("kernsatz", "")),
+                    html_schuetzen(v.get("datum", "")),
+                    html_schuetzen(v.get("hergang", "")),
+                    html_schuetzen(v.get("reaktion", "")),
+                    html_schuetzen(v.get("ende", "")),
+                    html_schuetzen(vr.get("warum_es_zaehlt", "")),
+                    html_schuetzen(vr.get("eigenes_risiko", "")),
+                    html_schuetzen(vr.get("worauf_achten", ""))))
+
     if d.get("unternehmen"):
         t.append('<div class="karte"><b>%s</b>'
                  '<div class="tabelle" style="margin-top:6px"><table>'
@@ -4092,6 +4135,10 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                         html_schuetzen(m.get("land", "")), preis,
                         html_schuetzen(m.get("bemerkung", ""))))
         t.append("</table></div>")
+        if token.get("vorbehalt"):
+            t.append('<div class="karte warn klein" style="margin-top:8px">'
+                     '<b>Vorbehalt zur Guete:</b> %s</div>'
+                     % html_schuetzen(token["vorbehalt"]))
         t.append('<div class="klein" style="margin-top:8px">Faehigkeit ist der '
                  'Qualitaetswert der Rangliste (0 bis 100). Preise in US-Dollar je '
                  'Million Token. Die hinterlegten Zeilen bilden die Spitzengruppe '

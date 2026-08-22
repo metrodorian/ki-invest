@@ -212,6 +212,18 @@
     {
       "thema": "Modellstart",
       "query": "Gemini 3.5 Pro release"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "AI model export control restriction foreign nationals"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "Anthropic OR OpenAI model access suspended government directive"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "China restrict access AI models overseas"
     }
   ],
   "blogs": [
@@ -496,7 +508,8 @@
         "stand": "2026-08-20",
         "bemerkung": ""
       }
-    ]
+    ],
+    "vorbehalt": "Die Guetewerte stammen aus Ranglisten, die ueber API-Anbieter messen. Wird ein Modell still mit geringerer Rechengenauigkeit ausgeliefert als angegeben - etwa FP4 statt FP8 -, faellt der gemessene Rang zu hoch aus. Unabhaengige Nachmessungen konnten einzelne veroeffentlichte Werte nicht reproduzieren. Die Preisluecke bei gleicher Faehigkeit ist deshalb als OBERGRENZE zu lesen, nicht als exakter Faktor. Hinzu kommt, dass Guete bei langem Kontext einbrechen kann: Bei GLM 5.2 sank die Erfolgsquote ab rund 8.000 Token von 52 auf 24 Prozent, sobald der Zwischenspeicher mit 8 statt 16 Bit lief - ein Modell mit Kontextklippe ist fuer agentische Arbeit nicht gleichwertig, auch wenn der Rang es nahelegt."
   },
   "alarmschwellen": {
     "aktiv": true,
@@ -742,6 +755,21 @@
       ],
       "folgerung_fuer_die_position": "Kein Kaufgrund auf Wochensicht: Qualitaetsargumente brauchen einen Ausloeser und werden erst eingepreist, wenn die Nachfrage tatsaechlich enttaeuscht. Ueber Quartale ein sehr guter Grund fuer Skepsis. Und beachte die Gegenrichtung: Die Garantie macht 4,25 Gigawatt erst finanzierbar - das ist Nachfrage nach genau der Ausruestung, gegen die die Vertiv-Position wettet. Fuer die Vertiv-Seite ist die Meldung eindeutig negativ.",
       "vorsicht_berichterstattung": "Bei diesem Thema laufen Schaetzungen, Erwaegungen ('weighs', 'explores') und eingereichte Verpflichtungen durcheinander. Im Juli kursierten 250 Mrd. fuer dieselbe Ohio-Garantie, die SEC-Einreichung nennt 105 Mrd. Lies die Einreichung, nicht die Schlagzeile."
+    },
+    "verfuegbarkeitsrisiko": {
+      "bezeichnung": "Verfuegbarkeitsrisiko westlicher Spitzenmodelle",
+      "stand": "2026-08-22",
+      "quelle": "Anthropic-Mitteilung zur Aussetzung, Berichterstattung Juni/Juli 2026",
+      "kernsatz": "Ein westliches Spitzenmodell kann fuer Nicht-US-Nutzer ueber Nacht unerreichbar werden - durch Anweisung der US-Regierung, ohne Vorlauf. Das ist ein Uebernahmemechanismus, der die Reibung nicht ueberwindet, sondern umgeht: Wer ein Modell nicht erreichen kann, waegt keinen Aufwand mehr ab.",
+      "vorfall": {
+        "datum": "2026-06-12",
+        "hergang": "Das US-Handelsministerium wies Anthropic an, Claude Fable 5 und Mythos 5 unter Exportkontrolle zu stellen. Untersagt war der Zugang 'by any foreign national, whether inside or outside the United States' - ausdruecklich ohne Ausnahme fuer Five Eyes oder EU-Staaten. Ausloeser war ein von Amazon-Forschern gefundener Jailbreak, der die Sicherheitsklassifikatoren umging. Weil sich die Staatsangehoerigkeit nicht in Echtzeit pruefen liess, wurden beide Modelle WELTWEIT abgeschaltet.",
+        "reaktion": "Drei Tage spaeter, am 15.06.2026, kuendigte das chinesische Unternehmen Z.ai GLM-5.2 an und fuehrte den Fable-5-Bann ausdruecklich als Beleg an, dass US-Modelle fuer internationale Kunden unzuverlaessig sind.",
+        "ende": "Am 30.06. wurden die Kontrollen aufgehoben, Fable 5 am 01.07. wieder freigegeben. Mythos 5 bleibt auf zugelassene Partner beschraenkt."
+      },
+      "warum_es_zaehlt": "Die Uebernahme-Reibung argumentiert mit Aufwand: Eigenbetrieb, Inferenzanbieter, Nutzungsregeln, deshalb brauchen Unternehmen Jahre. Eine Exportsperre hebelt das aus. Sie wirkt sofort, unangekuendigt und fuer alle Nicht-US-Nutzer gleichzeitig, und sie liefert chinesischen Anbietern ein Verkaufsargument, das nicht der Preis ist, sondern Verlaesslichkeit. Wiederholt sich das, beschleunigt es die Substitution unabhaengig davon, wie gross die Preisluecke ist.",
+      "eigenes_risiko": "Betrifft auch diesen Monitor: Er stuetzt sich auf Claude. Eine erneute Sperre wuerde die Einordnung ausfallen lassen. Die festen Alarmschwellen laufen ohne Claude weiter, die Kurse ebenso.",
+      "worauf_achten": "Neue Exportkontrollen oder Zugangsbeschraenkungen fuer Spitzenmodelle, in beide Richtungen. Auch Chinas Gegenrichtung zaehlt: Peking hat 2026 begonnen, den Auslandszugang zu eigenen Modellen einzuschraenken."
     }
   },
   "modell_releases": {
