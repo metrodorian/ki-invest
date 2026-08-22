@@ -390,6 +390,8 @@ die Börse Frankfurt und finanzen.net mit 403. Schlägt der Abruf fehl, greifen
 | `tokenpreise.json` / `tokennutzung.json` | Zeitreihen zu Modellpreisen und Verbrauch |
 | `verbesserungen.json` | gesammelte Vorschläge für den Sonntagslauf |
 | `verbesserung.stand` | Zeitmarke des letzten Verbesserungslaufs |
+| `VERBESSERUNG.md` | Bericht des letzten Sonntagslaufs |
+| `verbesserungen/` | dieselben Berichte datiert, als Archiv |
 | `bericht.html` | der zuletzt erzeugte Bericht |
 | `web/` | Weboberfläche samt Archiv |
 | `monitor.log`, `cron.log`, `bot.log`, `verbesserung.log` | Verlaufsprotokolle |

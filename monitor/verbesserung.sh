@@ -179,6 +179,18 @@ fi
 # den Betrieb.
 
 cd "$ARBEIT" || abbrechen "Arbeitskopie verschwunden"
+
+# Den Bericht datiert ablegen, bevor der naechste Lauf ihn ueberschreibt.
+# Ohne das gaebe es immer nur den letzten - und damit keine Moeglichkeit
+# nachzusehen, was vor drei Wochen entschieden wurde und warum.
+for QUELLE in "$ARBEIT/monitor/VERBESSERUNG.md" "$ARBEIT/VERBESSERUNG.md"; do
+    if [ -f "$QUELLE" ]; then
+        mkdir -p "$ARBEIT/monitor/verbesserungen"
+        cp "$QUELLE" "$ARBEIT/monitor/verbesserungen/VERBESSERUNG-$(date +%Y-%m-%d).md"
+        break
+    fi
+done
+
 if [ -n "$(git status --porcelain)" ]; then
     git add -A
     git commit --quiet -m "Woechentlicher Verbesserungslauf (Rest)" \

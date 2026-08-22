@@ -132,13 +132,18 @@ gefahrlos arbeiten, aber nicht schludern.
 
 ## Wenn du fertig bist
 
-Schreib eine Datei `VERBESSERUNG.md` in den Projektordner mit:
+Schreib eine Datei `VERBESSERUNG.md` in den Ordner `monitor/` mit:
 
 - **Umgesetzt:** was du geändert hast und warum, je Vorschlag ein Absatz.
   Nenne die Datei und was ein Leser im Bericht künftig sieht.
 - **Verworfen:** welche Vorschläge du nicht umgesetzt hast, je einen Satz.
 - **Aufgefallen:** was dir beim Lesen des Codes auffiel, das niemand
   vorgeschlagen hat. Auch Fehler, die du nicht behoben hast.
+
+Dieser Bericht wird nach dem Lauf datiert nach `monitor/verbesserungen/`
+kopiert und bleibt dort unverändert stehen — auch wenn sich später
+herausstellt, dass du danebenlagst. Schreib ihn entsprechend: mit den Zahlen,
+auf die du dich stützt, und mit dem Vorbehalt dort, wo du unsicher bist.
 
 Trage außerdem in `verbesserungen.json` bei jedem behandelten Eintrag
 `"erledigt": true` ein und ergänze `"ergebnis"` mit einem kurzen Satz.
