@@ -212,6 +212,18 @@
     {
       "thema": "Modellstart",
       "query": "Gemini 3.5 Pro release"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "AI model export control restriction foreign nationals"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "Anthropic OR OpenAI model access suspended government directive"
+    },
+    {
+      "thema": "Verfuegbarkeit",
+      "query": "China restrict access AI models overseas"
     }
   ],
   "blogs": [
@@ -496,7 +508,8 @@
         "stand": "2026-08-20",
         "bemerkung": ""
       }
-    ]
+    ],
+    "vorbehalt": "Die Guetewerte stammen aus Ranglisten, die ueber API-Anbieter messen. Wird ein Modell still mit geringerer Rechengenauigkeit ausgeliefert als angegeben - etwa FP4 statt FP8 -, faellt der gemessene Rang zu hoch aus. Unabhaengige Nachmessungen konnten einzelne veroeffentlichte Werte nicht reproduzieren. Die Preisluecke bei gleicher Faehigkeit ist deshalb als OBERGRENZE zu lesen, nicht als exakter Faktor. Hinzu kommt, dass Guete bei langem Kontext einbrechen kann: Bei GLM 5.2 sank die Erfolgsquote ab rund 8.000 Token von 52 auf 24 Prozent, sobald der Zwischenspeicher mit 8 statt 16 Bit lief - ein Modell mit Kontextklippe ist fuer agentische Arbeit nicht gleichwertig, auch wenn der Rang es nahelegt."
   },
   "alarmschwellen": {
     "aktiv": true,
@@ -681,6 +694,82 @@
         "Open-Weight heisst offengelegte Parameter, nicht offengelegte Trainingsdaten. Politische Faerbung laesst sich einem grossen Modell kaum wieder austreiben (ETH AI Center), was den Einsatzbereich einschraenkt."
       ],
       "folgerung": "Entwickler wechseln sofort, Unternehmen brauchen Jahre. Der hohe chinesische Anteil in der OpenRouter-Rangliste misst das erste Segment, nicht das zweite. Er ist ein Fruehindikator fuer Preisdruck, KEIN Marktanteil und kein Beleg dafuer, dass westliche Anbieter bereits Umsatz verlieren. Fuer eine Haltedauer von vier bis sechs Wochen wirkt die Effizienzseite langsamer, als die Preistabelle nahelegt."
+    },
+    "abschreibungsdauer": {
+      "bezeichnung": "Unterstellte Nutzungsdauer der Rechenzentrumshardware",
+      "stand": "2026-08-22",
+      "quelle": "10-K-Angaben der Unternehmen, Auswertungen zur Abschreibungsdebatte",
+      "einheit": "Jahre",
+      "warum_es_zaehlt": "Wer die angenommene Nutzungsdauer verlaengert, verteilt dieselben Kosten auf mehr Jahre und senkt den Abschreibungsaufwand im laufenden Gewinn. Zwischen 2022 und 2024 haben Microsoft, Alphabet, Meta und Oracle von rund vier auf fuenf bis sechs Jahre verlaengert - zusammen etwa 18 Mrd. USD weniger Abschreibung im Jahr. Michael Burry beziffert die Untererfassung auf rund 176 Mrd. USD zwischen 2026 und 2028 und rechnet vor, dass Oracles Gewinn 2028 dadurch um 26,9 Prozent und Metas um 20,8 Prozent zu hoch ausgewiesen wuerde. Veralten die Chips schneller als unterstellt, folgen Abschreibungen.",
+      "einschraenkung": "Dieser Vorwurf trifft die HYPERSCALER, nicht Nvidia - Nvidia verkauft die Chips, es schreibt sie nicht ab. Fuer die beiden gehaltenen Positionen ist er also nur mittelbar von Belang: Er sagt etwas ueber die Qualitaet der ausgewiesenen Gewinne derer, die den Capex bezahlen.",
+      "unternehmen": [
+        {
+          "name": "Microsoft",
+          "jahre": 6.0,
+          "seit": "2022",
+          "richtung": "verlaengert"
+        },
+        {
+          "name": "Alphabet",
+          "jahre": 6.0,
+          "seit": "2023",
+          "richtung": "verlaengert",
+          "bemerkung": "Verlaengerung von vier auf sechs Jahre senkte die Abschreibung allein 2023 um 3,9 Mrd. USD"
+        },
+        {
+          "name": "Meta",
+          "jahre": 5.5,
+          "seit": "2025-01",
+          "richtung": "verlaengert",
+          "bemerkung": "mehrere Schritte, zuletzt auf 5,5 Jahre"
+        },
+        {
+          "name": "Oracle",
+          "jahre": 5.0,
+          "seit": "2023",
+          "richtung": "verlaengert"
+        },
+        {
+          "name": "Amazon",
+          "jahre": 5.0,
+          "seit": "2025-01",
+          "richtung": "VERKUERZT",
+          "bemerkung": "gegenlaeufig: von sechs auf fuenf Jahre fuer einen Teil der Server, ausdruecklich begruendet mit dem beschleunigten Tempo der technologischen Entwicklung"
+        }
+      ],
+      "worauf_achten": "Das entscheidende Signal ist eine VERKUERZUNG, nicht der Stand. Amazon ist vorangegangen und hat den Grund selbst genannt. Folgt ein zweiter Hyperscaler, ist das ein Eingestaendnis schnellerer Veralterung aus erster Hand - und damit der Ausloeser, der Burrys Rechnung von einer Behauptung zu einem Ereignis macht. Achte in den Quartalsberichten auf 'change in estimated useful life' und auf ausserplanmaessige Abschreibungen auf Rechenzentrumshardware."
+    },
+    "zirkelfinanzierung": {
+      "bezeichnung": "Zirkelfinanzierung - Einordnung",
+      "stand": "2026-08-22",
+      "kernsatz": "Zahlungsfaehig heisst nicht unbedenklich. Nvidia geht daran kurzfristig nicht kaputt - der Mangel ist echt, aber langsam.",
+      "was_entlastet": [
+        "Nvidia finanziert aus dem Kassenbestand, nicht auf Kredit: rund 48 Mrd. USD freier Mittelzufluss in einem Quartal, Verschuldungsquote 0,07. Der Ansteckungsweg der Dotcom-Faelle fehlt damit: Lucent und Nortel VERSCHULDETEN sich, um ihre Kunden zu finanzieren, und wurden von deren Ausfaellen mitgerissen. Eine Abschreibung waere hier schmerzhaft, aber keine Existenzfrage."
+      ],
+      "was_nicht_entlastet": [
+        "UMSATZQUALITAET: Haftet ein Chiphersteller fuer die Mietverpflichtungen seines groessten Abnehmers, ist ein Teil des Umsatzes keine unabhaengige Nachfrage, sondern selbst erzeugte. Der Umsatz wird heute gebucht, die Haftung faellt spaeter an. Freier Mittelzufluss misst Vergangenheit und sagt darueber nichts.",
+        "BILANZ-ARTEFAKT: Eine Restwertgarantie erscheint in der Regel nicht als Schuld. Die Bilanz sieht sauber aus, WEIL das Risiko so gebaut ist, dass es dort nicht auftaucht. Die niedrige Verschuldungsquote als Beruhigung anzufuehren, waehrend die fragliche Verpflichtung ausserbilanziell liegt, ist selbst ein Zirkelschluss.",
+        "KORRELATION: Umsatz, Beteiligungen (OpenAI, SB Energy, CoreWeave) und Garantien haengen alle am selben Ereignis - dass die KI-Nachfrage haelt. Es gibt keine Streuung. Enttaeuscht die Nachfrage, trifft es alles gleichzeitig.",
+        "SYSTEMRISIKO: Selbst wenn Nvidia sicher ist, verschiebt der Kreislauf das Risiko zu den Gehebelten - Oracle mit 18 Mrd. neuen Schulden, CoreWeave, die Neoclouds, Private Credit. Ein System kann bruechig sein, ohne dass sein staerkster Knoten faellt. Die rund 3 Billionen ausserbilanzieller Verpflichtungen ueber neun Konzerne beschreiben das System, nicht Nvidias Bilanz.",
+        "PREISVERZERRUNG: Vom Verkaeufer finanzierte Nachfrage ist keine preisgefundene Nachfrage. Niemand weiss, was Rechenleistung kostet, wenn der Verkaeufer aufhoert, den Kaeufer zu unterschreiben."
+      ],
+      "folgerung_fuer_die_position": "Kein Kaufgrund auf Wochensicht: Qualitaetsargumente brauchen einen Ausloeser und werden erst eingepreist, wenn die Nachfrage tatsaechlich enttaeuscht. Ueber Quartale ein sehr guter Grund fuer Skepsis. Und beachte die Gegenrichtung: Die Garantie macht 4,25 Gigawatt erst finanzierbar - das ist Nachfrage nach genau der Ausruestung, gegen die die Vertiv-Position wettet. Fuer die Vertiv-Seite ist die Meldung eindeutig negativ.",
+      "vorsicht_berichterstattung": "Bei diesem Thema laufen Schaetzungen, Erwaegungen ('weighs', 'explores') und eingereichte Verpflichtungen durcheinander. Im Juli kursierten 250 Mrd. fuer dieselbe Ohio-Garantie, die SEC-Einreichung nennt 105 Mrd. Lies die Einreichung, nicht die Schlagzeile."
+    },
+    "verfuegbarkeitsrisiko": {
+      "bezeichnung": "Verfuegbarkeitsrisiko westlicher Spitzenmodelle",
+      "stand": "2026-08-22",
+      "quelle": "Anthropic-Mitteilung zur Aussetzung, Berichterstattung Juni/Juli 2026",
+      "kernsatz": "Ein westliches Spitzenmodell kann fuer Nicht-US-Nutzer ueber Nacht unerreichbar werden - durch Anweisung der US-Regierung, ohne Vorlauf. Das ist ein Uebernahmemechanismus, der die Reibung nicht ueberwindet, sondern umgeht: Wer ein Modell nicht erreichen kann, waegt keinen Aufwand mehr ab.",
+      "vorfall": {
+        "datum": "2026-06-12",
+        "hergang": "Das US-Handelsministerium wies Anthropic an, Claude Fable 5 und Mythos 5 unter Exportkontrolle zu stellen. Untersagt war der Zugang 'by any foreign national, whether inside or outside the United States' - ausdruecklich ohne Ausnahme fuer Five Eyes oder EU-Staaten. Ausloeser war ein von Amazon-Forschern gefundener Jailbreak, der die Sicherheitsklassifikatoren umging. Weil sich die Staatsangehoerigkeit nicht in Echtzeit pruefen liess, wurden beide Modelle WELTWEIT abgeschaltet.",
+        "reaktion": "Drei Tage spaeter, am 15.06.2026, kuendigte das chinesische Unternehmen Z.ai GLM-5.2 an und fuehrte den Fable-5-Bann ausdruecklich als Beleg an, dass US-Modelle fuer internationale Kunden unzuverlaessig sind.",
+        "ende": "Am 30.06. wurden die Kontrollen aufgehoben, Fable 5 am 01.07. wieder freigegeben. Mythos 5 bleibt auf zugelassene Partner beschraenkt."
+      },
+      "warum_es_zaehlt": "Die Uebernahme-Reibung argumentiert mit Aufwand: Eigenbetrieb, Inferenzanbieter, Nutzungsregeln, deshalb brauchen Unternehmen Jahre. Eine Exportsperre hebelt das aus. Sie wirkt sofort, unangekuendigt und fuer alle Nicht-US-Nutzer gleichzeitig, und sie liefert chinesischen Anbietern ein Verkaufsargument, das nicht der Preis ist, sondern Verlaesslichkeit. Wiederholt sich das, beschleunigt es die Substitution unabhaengig davon, wie gross die Preisluecke ist.",
+      "eigenes_risiko": "Betrifft auch diesen Monitor: Er stuetzt sich auf Claude. Eine erneute Sperre wuerde die Einordnung ausfallen lassen. Die festen Alarmschwellen laufen ohne Claude weiter, die Kurse ebenso.",
+      "worauf_achten": "Neue Exportkontrollen oder Zugangsbeschraenkungen fuer Spitzenmodelle, in beide Richtungen. Auch Chinas Gegenrichtung zaehlt: Peking hat 2026 begonnen, den Auslandszugang zu eigenen Modellen einzuschraenken."
     }
   },
   "modell_releases": {
