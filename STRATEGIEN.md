@@ -4,12 +4,34 @@ Alle Positionen als **taktische, kurzfristige** Wetten gedacht (Tage/Wochen), ni
 
 ## Gewählte Kombination
 
-| Position | Basiswert | WKN | Rolle in der These |
-|---|---|---|---|
-| 1 | Nvidia -2x | **MG4U8W** | Chip-Seite: profitiert heute vom Capex, leidet am stärksten bei Effizienzschock |
-| 2 | Vertiv -2x | **MR275A** | Bau-/Ausrüstungsseite: ~75% Umsatz aus Rechenzentren, stirbt bei Baustopp |
+Beide Positionen laufen seit dem 20.08.2026, Zeitlimit 17.09.2026.
 
-Beide sterben, wenn keine Rechenzentren mehr gebaut werden — aber es ist nicht zweimal dieselbe Aktie. Details zu den Produkten in [PLATTFORM.md](PLATTFORM.md).
+| | WKN | Faktor | Stück | Einsatz | Einstieg Schein | Stop | Barriere |
+|---|---|---|---|---|---|---|---|
+| Nvidia Short | **MG4U8W** | −2x | 2.222 | 1.003,80 € | 0,451755 | 0,294 | 324,00 USD |
+| Vertiv Short | **MR275A** | −2x | 9 | 1.030,95 € | 114,55 | 56,20 | 421,08 USD |
+
+Gesamteinsatz 2.034,75 € von 3.000 € — knapp ein Drittel bleibt als Puffer liegen.
+
+**Warum diese zwei.** Nvidia steht für die Chip-Seite: Sie verdient heute am Capex und leidet
+am stärksten bei einem Effizienzschock. Vertiv steht für die Bau- und Ausrüstungsseite: rund
+drei Viertel des Umsatzes aus Rechenzentren, das Geschäft stirbt bei einem Baustopp. Beide
+sterben, wenn nicht mehr gebaut wird — aber es ist nicht zweimal dieselbe Aktie.
+
+**Die Stops sind ungleich gesetzt**, und zwar mit Absicht. Vertiv schwankt mit rund 76 Prozent
+im Jahr fast doppelt so stark wie Nvidia mit 38. Der weite Stop bei −51 Prozent soll
+verhindern, dass gewöhnliches Rauschen die Position beendet, bevor die These überhaupt geprüft
+ist.
+
+**Der Preis dafür ist der tägliche Reset.** Bei Seitwärtslauf kostet Vertiv rund 3,3 Prozent
+pro Woche, Nvidia rund 0,8. Über die verbleibende Laufzeit sind das bei Vertiv gut zwölf
+Prozent allein durch Mechanik. Die Vertiv-Position muss also bald recht bekommen, die
+Nvidia-Position kann warten.
+
+Details zu den Produkten in [PLATTFORM.md](PLATTFORM.md), die laufende Überwachung in
+[monitor/README.md](monitor/README.md).
+
+---
 
 ---
 
@@ -24,7 +46,8 @@ Beide sterben, wenn keine Rechenzentren mehr gebaut werden — aber es ist nicht
 ## Kategorie 2: Rechenzentrums-Ausrüster (Vertiv, Comfort Systems, Sterling) — GEWÄHLT
 
 - **These**: Wenn der Bau stoppt, bricht der Auftragseingang **sofort** weg. Präziser als Neoclouds, die langlaufende Verträge haben, die noch eine Weile Umsatz liefern.
-- **Vertiv**: ~75% Umsatz aus Rechenzentren, Auftragsbestand über 15 Mrd. USD, KGV 47,47. Höchste Konzentration unter den etablierten Zulieferern.
+- **Vertiv**: ~75% Umsatz aus Rechenzentren, höchste Konzentration unter den etablierten Zulieferern.
+- **Wichtige Einschränkung seit dem Kauf**: Vertiv meldet seit dem ersten Quartal 2026 **weder Auftragseingang noch Book-to-Bill noch Auftragsbestand** je Quartal. Angekündigt am 11.02.2026 auf dem Q4-Call, begründet mit zu hoher Schwankung — im Quartal mit +252 Prozent Auftragseingang und 15 Mrd. Auftragsbestand, also den besten Zahlen der Firmengeschichte. Die Jahresangabe im 10-K bleibt. Das ist angekündigte Politik, kein Verstecken — es entzieht der Position aber die Kennzahl, an der sie eigentlich zu messen wäre. Der Ersatz aus der Bilanz (erhaltene Anzahlungen) trägt nur bedingt; siehe [RECHERCHE.md](RECHERCHE.md).
 - **Alternativen geprüft**: Comfort Systems (45% Umsatzanteil, ~12 Mrd. Auftragsbestand), Sterling Infrastructure (92% des Auftragsbestands "mission-critical"), EMCOR (breit diversifiziert, Puffer durch Gesundheit/Behörden/Energie), Schneider Electric (Europa, über 24% Umsatzanteil).
 - **Volatilität**: Vertiv-Wochenspanne 11,5% — handhabbar, im Gegensatz zu den Neoclouds.
 - **Sensitivität trotzdem hoch**: 17%-Abverkauf Ende Juli 2026.
@@ -60,8 +83,17 @@ Seit 12.06.2026 börsennotiert (WKN A42D4F), IPO zu 135 USD, aktuell ~140 USD, K
 - **xAI**: seit Februar 2026 in SpaceX aufgegangen, kein eigenständiges Instrument.
 - **Huawei**: nicht börsennotiert. **SMIC**: Shanghai/Hongkong, für deutsche Privatanleger kaum zugänglich.
 
-## Offene Punkte
+## Erledigt
 
-- [ ] Positionsgrößen und Einstiegszeitpunkt festlegen
-- [ ] Ausstiegsregel definieren (Stop-Loss? Zielkurs? Zeitlimit?)
-- [ ] Barriere-Abstand regelmäßig prüfen — die Reset-Barriere wandert täglich mit
+- [x] **Positionsgrößen und Einstieg** — je rund 1.000 €, gekauft am 20.08.2026
+- [x] **Ausstiegsregel** — Stop-Loss im Depot hinterlegt, Zeitlimit 17.09.2026
+- [x] **Barriere-Abstand laufend prüfen** — der Monitor rechnet ihn bei jedem Lauf neu und
+      warnt, sobald der Puffer unter 30 Prozent fällt
+
+## Offen
+
+- [ ] **Entscheidung am 26.08.** nach den Nvidia-Zahlen: halten, glattstellen oder Stop
+      nachziehen. Maßgeblich sind Prognose fürs Folgequartal gegen 103,1 Mrd. USD und
+      Bruttomarge gegen 75,0 Prozent.
+- [ ] **Reset-Barrieren nachtragen**, wenn sie zu weit von der Konfiguration abweichen — sie
+      wandern täglich mit.

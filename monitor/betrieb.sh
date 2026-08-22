@@ -213,9 +213,21 @@ aktualisieren)
     git checkout --quiet -B main origin/main || { echo "main nicht auszuchecken."; exit 1; }
     STAND=$(git rev-parse --short HEAD)
 
-    # Gleicht der Betrieb schon? Dann nichts tun.
-    if cmp -s "$ARBEIT/monitor/ki_monitor.py" "$HIER/ki_monitor.py" \
-       && cmp -s "$ARBEIT/monitor/config.json" "$HIER/config.json"; then
+    # Gleicht der Betrieb schon? Dann nichts tun. Verglichen wird jede Datei, die
+    # uebernommen wuerde - ein Vergleich von nur zwei Dateien haette eine
+    # Aenderung an webserver.py, an betrieb.sh selbst oder an der Dokumentation
+    # uebersehen und gemeldet, der Betrieb sei auf dem Stand von main.
+    UNTERSCHIED=0
+    for QUELLE in "$ARBEIT"/monitor/*.py "$ARBEIT"/monitor/*.sh \
+                  "$ARBEIT"/monitor/*.md "$ARBEIT/monitor/config.json"; do
+        [ -f "$QUELLE" ] || continue
+        ZIEL="$HIER/$(basename "$QUELLE")"
+        if [ ! -f "$ZIEL" ] || ! cmp -s "$QUELLE" "$ZIEL"; then
+            UNTERSCHIED=1
+            echo "  neu oder geaendert: $(basename "$QUELLE")"
+        fi
+    done
+    if [ "$UNTERSCHIED" = "0" ]; then
         echo "Betrieb ist bereits auf dem Stand von main ($STAND)."
         exit 0
     fi
@@ -223,9 +235,10 @@ aktualisieren)
     echo "Aktualisiere auf main ($STAND) ..."
     SICHERUNG="$HIER/.vor-aktualisierung"
     rm -rf "$SICHERUNG"; mkdir -p "$SICHERUNG"
-    cp "$HIER"/*.py "$HIER"/*.sh "$HIER/config.json" "$SICHERUNG/" 2>/dev/null || true
+    cp "$HIER"/*.py "$HIER"/*.sh "$HIER"/*.md "$HIER/config.json" \
+       "$SICHERUNG/" 2>/dev/null || true
 
-    cp "$ARBEIT"/monitor/*.py "$ARBEIT"/monitor/*.sh "$HIER/" 2>/dev/null
+    cp "$ARBEIT"/monitor/*.py "$ARBEIT"/monitor/*.sh "$ARBEIT"/monitor/*.md "$HIER/" 2>/dev/null
     cp "$ARBEIT/monitor/config.json" "$HIER/config.json"
     chmod +x "$HIER"/*.sh 2>/dev/null || true
 

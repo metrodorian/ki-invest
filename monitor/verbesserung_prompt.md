@@ -8,7 +8,7 @@ Frage beantworten. Was du hinterlässt, läuft ab sofort automatisch weiter.
 
 Der Monitor beobachtet die These: *Die westlichen KI-Investitionen erzeugen
 kaum Gegenwert, während China mit günstigerer Hardware aufholt.* Er läuft alle
-zehn Minuten, fragt alle drei Stunden dich um eine Einordnung und schickt bei
+zehn Minuten, fragt dich zweimal am Tag um eine Einordnung und schickt bei
 Schwellenverletzungen Alarme über Mail, Telegram und eine Lampe.
 
 In jedem dieser Läufe schlägst du Verbesserungen vor. Sie sind in
@@ -132,13 +132,18 @@ gefahrlos arbeiten, aber nicht schludern.
 
 ## Wenn du fertig bist
 
-Schreib eine Datei `VERBESSERUNG.md` in den Projektordner mit:
+Schreib eine Datei `VERBESSERUNG.md` in den Ordner `monitor/` mit:
 
 - **Umgesetzt:** was du geändert hast und warum, je Vorschlag ein Absatz.
   Nenne die Datei und was ein Leser im Bericht künftig sieht.
 - **Verworfen:** welche Vorschläge du nicht umgesetzt hast, je einen Satz.
 - **Aufgefallen:** was dir beim Lesen des Codes auffiel, das niemand
   vorgeschlagen hat. Auch Fehler, die du nicht behoben hast.
+
+Dieser Bericht wird nach dem Lauf datiert nach `monitor/verbesserungen/`
+kopiert und bleibt dort unverändert stehen — auch wenn sich später
+herausstellt, dass du danebenlagst. Schreib ihn entsprechend: mit den Zahlen,
+auf die du dich stützt, und mit dem Vorbehalt dort, wo du unsicher bist.
 
 Trage außerdem in `verbesserungen.json` bei jedem behandelten Eintrag
 `"erledigt": true` ein und ergänze `"ergebnis"` mit einem kurzen Satz.

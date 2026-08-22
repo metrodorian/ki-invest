@@ -216,12 +216,13 @@ Abschalten lässt sich der Aufruf über `"claude": {"aktiv": false}` in der
 ## Betrieb auf dem NAS
 
 Der Monitor läuft auf dem Raspberry Pi (OMV) unter `~/ki-invest`, gesteuert
-über cron. Der Mac ist abgeschaltet.
+über cron. Der Mac ist als `arbeitsplatz` eingetragen und erzeugt nie einen
+Bericht — weder automatisch noch von Hand.
 
 | Wann | Was |
 |---|---|
 | alle 10 Minuten, rund um die Uhr | Prüflauf ohne Claude; feste Alarmschwellen greifen sofort |
-| alle 3 Stunden (0, 3, 6 … 21 Uhr) | Prüflauf mit Claude-Einordnung |
+| 00:00 und 12:00 | Prüflauf mit Claude-Einordnung |
 | werktags 22:30 | Tagesbericht mit Mail an l.duncker@posteo.de |
 | beim Systemstart | Webserver auf Port 8088, Telegram-Bot |
 
@@ -343,6 +344,8 @@ Unterschied steckt nur im Ziel-Schalter:
 | `logs [n]` | letzte Zeilen aus cron.log, monitor.log, bot.log |
 | `lauf [--mit-claude]` | Monitorlauf anstossen |
 | `bericht` | Tagesbericht bauen und verschicken |
+| `verbesserung-zeigen` | was der Sonntagslauf auf dem Zweig `test` vorbereitet hat |
+| `aktualisieren` | den zusammengeführten Stand von `main` in den Betrieb holen |
 | `probealarm`, `probealarm-aus` | Meldekette testen und wieder abstellen |
 
 `pruefen` meldet auf dem Mac erwartungsgemaess fehlende Bloecke `mail`,
@@ -383,14 +386,33 @@ die Börse Frankfurt und finanzen.net mit 403. Schlägt der Abruf fehl, greifen
 | `config.json` | Positionen, Schwellen, Ticker, Suchbegriffe, Termine |
 | `state.json` | letzter Lauf, gemeldete Alarme, letztes Barometer |
 | `bilanzreihen.json` | Vorräte, Wareneinsatz und Anzahlungen je Quartal aus SEC-XBRL |
+| `config.lokal.json` | Mail, Telegram, Hue, Pfade, Rolle — **nicht im Repo** |
+| `tokenpreise.json` / `tokennutzung.json` | Zeitreihen zu Modellpreisen und Verbrauch |
+| `verbesserungen.json` | gesammelte Vorschläge für den Sonntagslauf |
+| `verbesserung.stand` | Zeitmarke des letzten Verbesserungslaufs |
+| `VERBESSERUNG.md` | Bericht des letzten Sonntagslaufs |
+| `verbesserungen/` | dieselben Berichte datiert, als Archiv |
 | `bericht.html` | der zuletzt erzeugte Bericht |
-| `monitor.log` | Verlaufsprotokoll |
-| `launchd.out.log` / `launchd.err.log` | Ausgaben der launchd-Jobs |
+| `web/` | Weboberfläche samt Archiv |
+| `monitor.log`, `cron.log`, `bot.log`, `verbesserung.log` | Verlaufsprotokolle |
 
 ## Grenzen
 
 Kursdaten kommen von öffentlichen Yahoo-Endpunkten und können verzögert sein —
-zur Beobachtung geeignet, nicht zur Orderausführung. Die Schein-Werte sind
-Näherungen aus der Basiswert-Bewegung mal Faktor, ohne Produktkosten und ohne
-Pfadeffekt; der echte Kurs steht im ING-Depot. Die Stichwort-Einordnung von
-Nachrichten ist eine grobe Vorsortierung, keine Bewertung.
+zur Beobachtung geeignet, nicht zur Orderausführung.
+
+Der Scheinkurs wird beim Emittenten abgerufen und in der Spalte „Schein ist"
+gegen den Einstieg gestellt — das ist die maßgebliche Zahl. Daneben steht die
+Näherung `Faktor × Basiswertbewegung`; beide laufen regelmäßig um mehrere
+Prozentpunkte auseinander, weil die Kurse aus verschiedenen Momenten stammen.
+Der Bericht warnt, wenn der Abstand 1,5 Punkte übersteigt. Vor einer
+Entscheidung gilt der Kurs im ING-Depot.
+
+Die Stichwort-Einordnung von Nachrichten ist eine grobe Vorsortierung, keine
+Bewertung. Claude stuft bei jedem Lauf falsch eingeordnete Meldungen um, und
+diese Umstufung fließt ins Barometer ein. Prognosen und Mehrjahresschätzungen
+zählen in keiner Richtung mit, weil sie die Vergangenheit fortschreiben.
+
+**Mehrere Indikatoren messen dasselbe.** Sieben Relativstärke-Werte bilden im
+Kern eine einzige Rotation ab. Ein hohes Barometer bedeutet deshalb nicht
+automatisch viele unabhängige Belege.

@@ -15,14 +15,31 @@ Verworfen: comdirect (7-10 Werktage Kontoeröffnung), Trade Republic (Gamificati
 - **Aber:** Zertifikate von ING-Partneremittenten kosten **0 € Ordergebühr** (zzgl. Spread). Morgan Stanley und J.P. Morgan gehören dazu, **UniCredit offenbar nicht** (ING zeigt dort "kein Wert vorhanden" in der Gebührenspalte).
 - Kein Zugang zu Lang & Schwarz
 
-## Gewählte Positionen
+## Gekaufte Positionen
 
-| Position | WKN | Emittent | Faktor | Barriere | Puffer | Spread |
+Ausgeführt am 20.08.2026 über den ING-Direkthandel.
+
+| | WKN | Emittent | Faktor | Barriere | Einstieg Basiswert | Spread |
 |---|---|---|---|---|---|---|
-| Nvidia Short | **MG4U8W** | Morgan Stanley | -2x | 324,42 USD | ~44% | 2,38% |
-| Vertiv Short | **MR275A** | Morgan Stanley | -2x | 413,37 USD | ~40,7% | 0,25% |
+| Nvidia Short | **MG4U8W** | Morgan Stanley | −2x | 324,00 USD | 217,56 USD | 2,6 % |
+| Vertiv Short | **MR275A** | Morgan Stanley | −2x | 421,08 USD | 261,00 USD | 0,94 % |
 
-Beide Faktor-Optionsscheine, Endlos-Laufzeit, 0 € Ordergebühr bei ING. Referenzkurse: Nvidia 225,16 USD, Vertiv 293,84 USD (Stand 14.08.2026).
+Beide Faktor-Optionsscheine mit Endlos-Laufzeit, 0 € Ordergebühr.
+
+Die Barrieren weichen von den Kandidatenwerten der Recherche ab (324,42 und 413,37 USD), weil
+sie **täglich mitwandern**. Sie stehen in der Konfiguration des Monitors und müssen dort
+nachgetragen werden, sonst zeigt der Bericht einen falschen Puffer an.
+
+Der Spread bei Nvidia ist mit 2,6 Prozent der teuerste Teil der Position — bei einem Einsatz
+von rund 1.000 € kostet allein der Ein- und Ausstieg etwa 26 €, mehr als jede Ordergebühr.
+Vertiv ist mit 0,94 Prozent deutlich günstiger.
+
+### Direkthandel oder Börse
+
+Beide Käufe liefen über den Direkthandel mit Morgan Stanley, nicht über Stuttgart. Der
+Emittent stellt dort dieselben Kurse, und die 1,90 € Handelsplatzentgelt entfallen. Bei
+Zertifikaten aus dem 0-€-Programm ist der Direkthandel deshalb praktisch immer die
+günstigere Wahl.
 
 ## Wichtigste Produktlektionen aus der Recherche
 
@@ -69,4 +86,22 @@ Faktor-Optionsscheine auf den Magnificent-7-Index (Morgan Stanley) existieren nu
 
 ## Mechanik-Hinweis
 
-Gehebelte Produkte resetten **täglich**. Bei volatiler Seitwärtsbewegung frisst der Compounding-Effekt Rendite, auch wenn die These langfristig aufgeht. Für taktische Positionen (Tage/Wochen) gebaut, nicht für Buy-and-Hold.
+Gehebelte Produkte resetten **täglich**. Bei volatiler Seitwärtsbewegung frisst der
+Compounding-Effekt Rendite, auch wenn die These langfristig aufgeht. Für taktische Positionen
+gebaut, nicht für Buy-and-Hold.
+
+Was das konkret kostet, lässt sich vorher ausrechnen: Der erwartete Wertverlust bei
+Seitwärtslauf beträgt `exp(0,5 · L · (1−L) · σ² · T) − 1`. Bei Faktor −2 und Vertivs
+Jahresschwankung von 76 Prozent sind das **rund 3,3 Prozent pro Woche**, bei Nvidias 38
+Prozent nur 0,8. Der Monitor führt diesen Wert als eigene Spalte mit.
+
+## Eine Beobachtung zur Kursquelle
+
+Der abgerufene Scheinkurs und der Basiswertkurs stammen aus verschiedenen Momenten. Die
+daraus abgeleitete Näherung `Faktor × Basiswertbewegung` weicht deshalb regelmäßig um mehrere
+Prozentpunkte vom tatsächlichen Scheinkurs ab — zuletzt um −3,2 bei Nvidia und +3,2 bei
+Vertiv, also gleich groß und entgegengesetzt.
+
+**Es gilt der abgerufene Kurs.** Der Bericht führt beide getrennt und warnt, wenn sie um mehr
+als 1,5 Punkte auseinanderlaufen. Vor einer Entscheidung sollte der Kurs zusätzlich direkt bei
+ING abgelesen werden.
