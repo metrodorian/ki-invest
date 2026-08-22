@@ -32,18 +32,31 @@ Klassisches Blasen-Warnsignal: Der Zulieferer bucht Umsatz, den er selbst finanz
 
 Quellen: [FNEX](https://fnex.com/xai-secures-funding-with-nvidia/), [TECHi](https://www.techi.com/neocloud-stocks/)
 
-## Hyperscaler-Capex 2026
+## Hyperscaler-Capex 2026 — Quartalsreihe
 
-- Gesamt ~725 Mrd. USD: **Amazon 220 Mrd.** (nach oben revidiert), **Alphabet 195-205 Mrd.** (von 180-190 angehoben), **Microsoft ~190 Mrd.**, **Meta 145 Mrd.**
-- CAGR seit 2022: ~65% p.a. (162 Mrd. → 725 Mrd.)
-- ~75% davon (~450 Mrd.) laut CreditSights direkt AI-Infrastruktur
-- Amazons Free Cashflow: Prognose negativ für 2026
-- Mega-Cap-Tech handelt mit KGV ~25x, **49% Premium** ggü. Rest S&P 500
-- Prognose für 2027: über 1 Billion USD
+Je Quartal in Milliarden USD, **nicht kumuliert**. Microsoft bilanziert auf ein
+Juni-Geschäftsjahr, seine Quartale sind gegenüber dem Kalender verschoben.
 
-**Keine belastbare Zahl** existiert dafür, welcher Anteil der Marktkapitalisierung "KI-Erwartung" ist — KI ist kein eigenes Geschäftssegment, sondern in Cloud-Wachstum, Werbe-Targeting und Produktivitätstools eingebettet.
+| Zeitraum | Amazon | Alphabet | Microsoft | Meta | Summe |
+|---|---|---|---|---|---|
+| Q1 2026 | 44,2 | 35,7 | 30,9 | 19,9 | 130,6 |
+| Q2 2026 | 54,2 | 44,9 | 35,8 | 31,1 | **166,0** |
+| **Halbjahr 2026** | 98,4 | 80,6 | 66,7 | 50,9 | **296,6** |
+| Prognose 2026 | 200 | 180 | 190 | 135 | **705** |
+| Ist 2025 | | | | | 410 |
 
-**Microsoft 2026**: -21% seit Jahresbeginn, zweitschwächster Mag-7-Wert, trotz (oder wegen) 190 Mrd. Capex. Ein Teil der These ist hier bereits eingepreist.
+Metas Q1-Wert ist aus der Gesamtsumme abgeleitet, nicht aus der Meldung entnommen.
+
+**Die prüfbare Aussage daraus:** Im ersten Halbjahr flossen 296,6 Mrd. Um die Jahresprognose
+von rund 705 Mrd. zu erreichen, müssten im zweiten Halbjahr etwa 408 Mrd. folgen — **gut 38
+Prozent mehr als im ersten**. Q3 müsste bei 190 bis 200 Mrd. landen. Bleibt es bei 166, ist
+die Prognose rechnerisch nicht zu halten, und eine gekürzte Prognose wäre das Signal, auf das
+die Positionen warten.
+
+Solange die Summe steigt, arbeitet sie **gegen** die These. +87 Prozent zum Vorjahr, +27
+Prozent zum Vorquartal.
+
+*Quelle: rexshares.com/nvidia-earnings, Unternehmensmeldungen, Stand 21.08.2026.*
 
 ## Index-Konzentration
 
@@ -102,3 +115,163 @@ Implizite Volatilität (ältere Referenzpunkte): Nvidia ~37,7% (Mai 2026), Micro
 ## Verworfene These: Palantir
 
 Zunächst wegen hoher Bewertung genannt (Forward-KGV 130,9 vs. Sektor-Median 29,1), betreibt aber selbst keine AI-Infrastruktur-Investments — reine Software-/Datenanalyse-Firma. Korreliert mit AI-Sentiment, ist aber nicht strukturell dem Capex-Mechanismus ausgesetzt.
+
+
+---
+
+# Datenpunkte seit dem Einstieg (20.–22.08.2026)
+
+## Nvidia Q2 GJ2027 — die Messlatten für den 26.08.
+
+| | Wert |
+|---|---|
+| Konsens Umsatz | 91,85 Mrd. USD (40 Häuser) |
+| Konsens Gewinn je Aktie | 2,08 |
+| Eigene Prognose | 91,0 Mrd. ± 2 % |
+| Bruttomarge geführt | 75,0 % (GAAP 74,9 %) |
+| Einkaufsverpflichtungen | über 145 Mrd. |
+| Vorquartal | 81,6 Mrd., davon Rechenzentrum 75,2 |
+| **Konsens Folgequartal** | **103,1 Mrd. USD** |
+
+Die letzte Zeile ist die eigentliche Messlatte. Eine Prognose darunter bricht die
+Wachstumserwartung. Die Bruttomarge zeigt nachlassende Preissetzungsmacht ein bis zwei
+Quartale früher als der Umsatz; eine Abschreibung auf Vorräte wäre das deutlichste
+Einzelsignal überhaupt.
+
+## Nvidias außerbilanzielle Verpflichtungen
+
+Aus einer 8-K-Meldung vom 17.08.2026: Nvidia garantiert Restwerte von **bis zu 105 Mrd. USD**
+für Leasingverpflichtungen über 4,25 Gigawatt am PORTS-Pike-Campus in Ohio. Mieter ist eine
+OpenAI-Tochter mit einem Zwanzigjahresvertrag über rund acht Gigawatt. Zahlt der Mieter nicht
+und kann der Vermieter die Anlage nicht ausreichend weiterverwerten, trägt Nvidia die
+Differenz. Zusätzlich beteiligt sich Nvidia mit 1,5 Mrd. am Entwickler SB Energy.
+
+Im Juli kursierende Berichte über 250 Mrd. waren zu hoch; die Einreichung nennt 105.
+
+**Einordnung:** Die Meldung hat zwei Richtungen. Als Nachfragesignal spricht sie gegen die
+Positionen — hier entstehen acht Gigawatt Rechenleistung. Als Signal für die Umsatzqualität
+spricht sie dafür: Ein Chiphersteller, der für die Mietverpflichtungen seines größten
+Abnehmers haftet, kauft sich Umsatz gegen Haftung. Das ist keine unabhängige Nachfrage.
+
+## Vertiv: die Kennzahl fehlt, der Ersatz trägt nur bedingt
+
+Vertiv meldet seit Q1 2026 keinen Auftragseingang, kein Book-to-Bill und keinen
+Auftragsbestand je Quartal mehr — **angekündigt am 11.02.2026** auf dem Q4-Call, begründet mit
+zu hoher Schwankung, im Quartal mit +252 Prozent Auftragseingang und 15 Mrd. Auftragsbestand.
+Die Jahresangabe im 10-K bleibt.
+
+Als Ersatz dienen die **erhaltenen Anzahlungen** aus der Bilanz
+(`us-gaap:ContractWithCustomerLiabilityCurrent`, CIK 1674101, frei über `data.sec.gov`):
+
+| Stichtag | Mrd. USD |
+|---|---|
+| 30.09.2025 | 1,132 |
+| 31.12.2025 | 1,815 |
+| 31.03.2026 | 2,462 |
+| 30.06.2026 | **3,634** |
+
+In drei Quartalen verdreifacht, +48 Prozent im letzten Quartal.
+
+**Drei Vorbehalte, die den Indikator entkräften:**
+
+1. **Bestand, kein Fluss.** Der Posten fällt erst, wenn die Umsatzrealisierung den Zufluss
+   überholt — bei zwölf Monaten Auftragsdeckung also erst in drei bis sechs Quartalen. Auf
+   einem Horizont von Wochen kann er die These weder bestätigen noch widerlegen.
+2. **Spiegelbild des Ausführungsproblems.** Der Q2-Umsatz verfehlte den Konsens (3,274 gegen
+   3,38 Mrd.) wegen Lieferkettenstaus. Nicht ausgelieferte Ware bei kassiertem Geld erhöht die
+   Anzahlungen — steigende Anzahlungen und verfehlter Umsatz sind teilweise dasselbe Ereignis
+   in zwei Bilanzzeilen.
+3. **Rationierungsmittel.** Vorauszahlungen steigen bei knapper Kapazität. Lässt die Knappheit
+   nach, fällt der Posten bei unverändertem Auftragsvolumen — ein Rückgang wäre dann das
+   Gegenteil eines Nachfrageeinbruchs.
+
+Nächster Quartalsbericht: 28.10.2026, nach dem Zeitlimit der Position.
+
+## Kreditaufschläge nach Bonität
+
+ICE BofA, optionsbereinigt, über FRED. Stand 21.08.2026:
+
+| | Stand | Woche | Monat |
+|---|---|---|---|
+| Index gesamt | 275 Bp | +4 | +7 |
+| BB | 163 Bp | +3 | +6 |
+| **B** | **294 Bp** | **+6** | **+9** |
+| CCC und schlechter | 1.035 Bp | +11 | **+54** |
+
+**Wichtig für die Deutung:** Die schuldenfinanzierten GPU-Vermieter begeben typischerweise im
+**B-Bereich, nicht in CCC**. Der CCC-Index ist ein Universum öffentlich begebener Anleihen mit
+wenigen, marktwertgewichteten Emittenten, geprägt von Altlast-Sektoren. Die KI-Verschuldung
+liegt überwiegend woanders: in Private Credit, das gar nicht bewertet wird, in
+Rechenzentrums-ABS mit meist erstklassigen Tranchen, in Hyperscaler-Anleihen und in Leveraged
+Loans.
+
+Die CCC-Ausweitung von +54 Bp ist deshalb **kein Beleg für KI-Stress**, solange B sich nicht
+mitbewegt — und B bewegt sich mit +9 Bp kaum. Einzelaufschläge auf CoreWeave, Oracle oder
+Nebius wären diagnostisch, sind aber nicht frei verfügbar.
+
+## Modellqualität gegen Preis
+
+Nach Qualitätsrang sortiert, Preis je Million Ausgabe-Token in USD:
+
+| Güte | Modell | Land | Ausgabe |
+|---|---|---|---|
+| 100 | Claude Fable 5 / Mythos 5 | US | 50,00 |
+| 99 | Claude Opus 5 | US | 25,00 |
+| 98 | GPT-5.6 Sol | US | 30,00 |
+| 97 | GPT-5.5 | US | 30,00 |
+| **97** | **Kimi K3** | **CN** | **3,20** |
+| 96 | Qwen3.8 Max | CN | 6,00 |
+| 89 | DeepSeek V4 Pro | CN | 0,87 |
+
+**In der Spitzengruppe kostet der Westen das rund Elffache.** Das ist der einzige direkte
+Messwert für die Effizienzseite der These — und eine Preisliste, keine Zahlung.
+
+Unabhängig bestätigt: Artificial Analysis ordnet Kimi K3 bei Index 57 ein, auf Höhe von Opus
+4.8 und GPT-5.5, hinter Fable 5 und GPT-5.6 Sol.
+
+## Tatsächlicher Verbrauch
+
+OpenRouter-Rangliste, wöchentlich, Stand 21.08.2026: **73,7 Prozent** der abgerechneten Token
+entfallen auf chinesische Anbieter (39,0 von 52,9 Billionen). Angeführt von DeepSeek V4 Flash
+(11,4 Bio.), Tencent Hy3 (9,22) und Xiaomi MiMo-V2.5 (6,92).
+
+**Die Höhe überzeichnet stark.** OpenRouter vermittelt vor allem Entwicklerverkehr;
+Unternehmensvolumen läuft direkt zu den Anbietern oder über Azure, Bedrock und Vertex und
+taucht dort gar nicht auf. Aussagekräftig ist allein die Veränderung über die Wochen — und
+zwar für das preisempfindliche Segment, in dem sich ein Wechsel zuerst zeigen würde.
+
+## Erwartete Modell-Veröffentlichungen
+
+| Modell | Land | Erwartet | Sicherheit |
+|---|---|---|---|
+| Gemini 3.5 Pro | US | angekündigt, ohne Datum | angekündigt |
+| GPT-6 | US | zweite Jahreshälfte 2026 | erwartet, nicht angekündigt |
+| Qwen 4.0 | CN | September 2026 | Gerücht |
+| Kimi K4 / DeepSeek V5 | CN | offen | unbestätigt |
+
+Erreicht Qwen 4 Güte 97 zu Qwen-Preisen, ist die Preislücke bei gleicher Fähigkeit belegt
+statt behauptet — das stärkste Einzelereignis für die These. Ein GPT-6 mit deutlichem
+Qualitätssprung wäre das Gegenteil.
+
+## Übernahme-Reibung
+
+*Quelle: NZZ, 22.07.2026.*
+
+Zwischen „zehnmal billiger" und „wird auch genommen" liegen Eigenbetrieb, Inferenzanbieter,
+Entzerrung politischer Färbung und Nutzungsregeln.
+
+**Dafür:** Ein Schweizer Unternehmen mit 75 Beschäftigten setzt Kimi seit Juni ein und spart
+rund 40 Prozent der KI-Kosten. Kimi K3 entstand trotz US-Exportbeschränkungen auf schwächeren
+Chips — genau der Mechanismus der These.
+
+**Dagegen:** Von zwanzig Mitgliedsfirmen des Verbands Swiss AI testen nur einzelne. Ein
+Startup brach den DeepSeek-Versuch ab, weil der Aufwand rund hundert Franken Ersparnis im
+Monat nicht rechtfertigte. Selbst der überzeugte Anwender verbietet das Modell für
+personenbezogene Daten, Betriebsdaten und Zugangsschlüssel und lässt nur sechs Entwickler
+heran — über einen US-Inferenzanbieter als Barriere. Open-Weight heißt offengelegte Parameter,
+nicht offengelegte Trainingsdaten; politische Färbung lässt sich einem großen Modell kaum
+wieder austreiben.
+
+**Folgerung:** Entwickler wechseln sofort, Unternehmen brauchen Jahre. Der hohe Anteil in der
+OpenRouter-Rangliste ist ein Frühindikator für Preisdruck, **kein Marktanteil** und kein Beleg
+dafür, dass westliche Anbieter bereits Umsatz verlieren.
