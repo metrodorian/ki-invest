@@ -2984,28 +2984,33 @@ def kernbox(indikatoren, gruppen_ansicht, mit_steuerung=True):
     nach_name = {i["name"]: i for i in indikatoren}
     t = ['<aside class="kernbox">']
 
-    haupt = nach_name.get("Hochzins-Risikoaufschlag")
-    if haupt:
-        klasse = ("gut" if haupt["these"] == "gut"
-                  else "schlecht" if haupt["these"] == "schlecht" else "neutral")
-        # Skala von -3 bis +3 Prozentpunkten: links rot (Risikofreude, gegen
-        # die These), Mitte grau, rechts gruen (Stress, fuer die These).
-        # Skala von 200 bis 800 Basispunkten: links eng (Geld billig, gegen
-        # die These), rechts weit (Stress, fuer die These).
-        anteil = max(0.0, min(1.0, (haupt["wert"] - 200.0) / 600.0))
-        veraenderung = haupt.get("veraenderung_monat", 0.0)
+    # Die Aufschlaege nach Bonitaetsstufe nebeneinander, ohne Erklaerung. Erst
+    # der Vergleich zeigt, was zaehlt: Bewegt sich die ganze Skala oder nur ihr
+    # unteres Ende? Der blosse Stand einer einzelnen Stufe sagt nichts.
+    stufen = [
+        ("Index gesamt", nach_name.get("Hochzins-Risikoaufschlag"), 200.0, 800.0),
+        ("B", nach_name.get("Risikoaufschlag B"), 200.0, 800.0),
+        ("CCC und schlechter", nach_name.get("Streuung am unteren Ende"),
+         500.0, 2000.0),
+    ]
+    vorhanden = [(name, i, u, o) for name, i, u, o in stufen if i]
+    if vorhanden:
         t.append('<div class="kern-haupt">'
-                 '<div class="kern-titel">Hochzins-Risikoaufschlag</div>'
-                 '<div class="kern-wert %s">%.0f <span class="einheit">Bp</span></div>'
-                 '<div class="klein" style="margin:-2px 0 4px">%+.0f Bp im Monat</div>'
-                 '<div class="kernskala"><i style="left:calc(%.1f%% - 1px)"></i></div>'
-                 '<div class="kernskala-marken"><span>200 billig</span>'
-                 '<span>500 Schnitt</span><span>800 Stress</span></div>'
-                 '<div class="kern-hinweis">Was schlechte Schuldner ueber sichere '
-                 'zahlen. <b>Steigt er, wird Fremdkapital teuer</b> &ndash; das '
-                 'stuetzt die These. Eine Blase platzt ueber die Finanzierung.'
-                 '</div></div>'
-                 % (klasse, haupt["wert"], veraenderung, anteil * 100))
+                 '<div class="kern-titel">Risikoaufschl&auml;ge</div>')
+        for name, i, unten, oben in vorhanden:
+            klasse = ("gut" if i["these"] == "gut"
+                      else "schlecht" if i["these"] == "schlecht" else "neutral")
+            anteil = max(0.0, min(1.0, (i["wert"] - unten) / (oben - unten)))
+            monat = i.get("veraenderung_monat", 0.0)
+            t.append('<div class="kern-stufe">'
+                     '<div class="kern-stufe-kopf"><span>%s</span>'
+                     '<b class="%s">%.0f <span class="einheit">Bp</span></b></div>'
+                     '<div class="kern-stufe-zeile">%+.0f Bp im Monat</div>'
+                     '<div class="kernskala"><i style="left:calc(%.1f%% - 1px)"></i>'
+                     '</div></div>'
+                     % (name, klasse, i["wert"], monat, anteil * 100))
+        t.append('<div class="kernskala-marken"><span>eng</span>'
+                 '<span>Schnitt</span><span>Stress</span></div></div>')
 
     weitere = [nach_name[n] for n in KERNINDIKATOREN[1:] if n in nach_name]
     if weitere:
@@ -3171,22 +3176,15 @@ NAVIGATION = """
       if (!liste || !liste.length) return;
       liste.sort(function (a, b) { return a.datei < b.datei ? 1 : -1; });  // neueste zuerst
 
+      // Der neueste Archiveintrag zeigt denselben Stand wie die Startseite, nur
+      // eingefroren. Er wird deshalb als "aktuell" gefuehrt und verweist auf die
+      // Startseite - die laedt sich selbst nach und zeigt die Bedienknoepfe.
+      liste[0].beschriftung += " (aktuell)";
+
       var hier = selbst
         ? liste.findIndex(function (e) { return e.datei === selbst; })
-        : -1;
-
-      // Die Startseite zwischen zwei Archiveintraegen hat selbst keinen
-      // Dateinamen. Sie wird deshalb als eigener, aktueller Stand vorne
-      // eingereiht - sonst zaehlte die Navigation an ihr vorbei.
-      if (hier < 0) {
-        var jetzt = (wurzel.textContent || "").match(/(\d{2}\.\d{2}\.\d{4}), (\d{2}:\d{2})/);
-        liste.unshift({
-          datei: "",
-          beschriftung: jetzt ? jetzt[1] + ", " + jetzt[2] + " (aktuell)" : "aktuell",
-          barometer: null
-        });
-        hier = 0;
-      }
+        : 0;
+      if (hier < 0) { hier = 0; }
       if (liste.length < 2) return;
 
       liste.forEach(function (e, i) {
@@ -3197,18 +3195,25 @@ NAVIGATION = """
         auswahl.appendChild(o);
       });
 
+      function zurStartseite() {
+        // Von einer Archivseite aus liegt die Startseite eine Ebene hoeher.
+        return basis ? "../index.html" : "index.html";
+      }
+
       function hin(i) {
         if (i < 0 || i >= liste.length) return;
+        // Der neueste Eintrag fuehrt immer auf die Startseite, nicht auf seine
+        // eingefrorene Kopie im Archiv.
+        if (i === 0) { location.href = zurStartseite(); return; }
         var ziel = liste[i].datei;
-        location.href = ziel ? basis + ziel : (basis ? "./" : "index.html");
+        location.href = ziel ? basis + ziel : zurStartseite();
       }
       zurueck.disabled = hier >= liste.length - 1;   // links = aelter
       vor.disabled = hier <= 0;                      // rechts = neuer
       zurueck.onclick = function () { hin(hier + 1); };
       vor.onclick = function () { hin(hier - 1); };
       auswahl.onchange = function () {
-        var ziel = auswahl.value;
-        location.href = ziel ? basis + ziel : (basis ? "./" : "index.html");
+        hin(auswahl.selectedIndex);
       };
       stelle.textContent = (hier + 1) + " von " + liste.length;
       document.addEventListener("keydown", function (e) {
@@ -3315,7 +3320,13 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
 h3{font-size:14px;margin:20px 0 8px;font-weight:600}
 .kopf{color:var(--gedaempft);font-size:13px;display:flex;align-items:center;
  gap:12px;flex-wrap:wrap}
-.blaettern{display:flex;align-items:center;gap:6px;margin-left:auto}
+.kopf-zeit{white-space:nowrap}
+.kopf-verlauf{display:flex;align-items:center;gap:7px;margin-left:auto}
+.kopf-verlauf span{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.kopf-verlauf svg{display:block;height:26px;width:auto}
+.blaettern{display:flex;align-items:center;gap:6px}
+.kopf-verlauf ~ .blaettern{margin-left:0}
+.kopf > .blaettern:first-of-type{margin-left:auto}
 .blaettern button{font:inherit;font-size:14px;line-height:1;cursor:pointer;
  background:var(--flaeche);color:var(--text);border:1px solid var(--rand);
  border-radius:7px;padding:4px 10px}
@@ -3412,6 +3423,20 @@ ul.liste li:last-child{border-bottom:none}
  font-variant-numeric:tabular-nums;margin-bottom:5px}
 .kern-wert .einheit{font-size:15px;font-weight:600;opacity:.7}
 .kern-hinweis{font-size:11.5px;color:var(--gedaempft);line-height:1.45}
+/* Drei Bonitaetsstufen untereinander, jede mit eigener Skala. Ohne Fliesstext:
+   Der Vergleich der Stufen ist die Aussage, nicht die einzelne Zahl. */
+.kern-stufe{margin-bottom:11px}
+.kern-stufe:last-of-type{margin-bottom:4px}
+.kern-stufe-kopf{display:flex;justify-content:space-between;align-items:baseline;
+ gap:8px}
+.kern-stufe-kopf span{font-size:11.5px;color:var(--gedaempft)}
+.kern-stufe-kopf b{font-size:20px;font-weight:650;letter-spacing:-.01em;
+ font-variant-numeric:tabular-nums;white-space:nowrap}
+.kern-stufe-kopf b .einheit{font-size:11px;font-weight:600;opacity:.7}
+.kern-stufe-zeile{font-size:10.5px;color:var(--gedaempft);
+ font-variant-numeric:tabular-nums}
+.kern-stufe .kernskala{height:6px;margin:5px 0 0}
+.kern-stufe .kernskala i{top:-2px;height:10px}
 .kernskala{height:8px;border-radius:4px;margin:9px 0 4px;position:relative;
  background:linear-gradient(90deg,var(--schlecht) 0%,var(--flaeche2) 42%,
  var(--flaeche2) 58%,var(--gut) 100%)}
@@ -3546,18 +3571,25 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              '<body>%s' % (STIL, '<div class="mailseite">' if fuer_mail
                               else '<div class="seite"><div class="inhalt">'))
 
-    t.append('<div class="kopf" data-basis="%s" data-datei="%s">%s%s%s</div>'
+    balken = barometer_verlauf_balken(barometer_verlauf)
+
+    # Der Verlauf steht in der Kopfzeile, nicht am Barometer: Dort beantwortet er
+    # die Frage, die man beim Aufschlagen zuerst hat - wohin es sich bewegt -,
+    # ohne den Blick vom aktuellen Wert wegzuziehen.
+    verlauf_kopf = ('<div class="kopf-verlauf"><span>Verlauf</span>%s</div>'
+                    % balken) if balken else ""
+    t.append('<div class="kopf" data-basis="%s" data-datei="%s">'
+             '<span class="kopf-zeit">%s%s</span>%s%s</div>'
              '<h1>KI-Invest Monitor</h1>'
              % (html_schuetzen(archiv_basis), html_schuetzen(archiv_datei or ""),
                 jetzt.strftime("%A, %d.%m.%Y, %H:%M Uhr"), limit_text,
-                "" if fuer_mail else NAVIGATION))
+                verlauf_kopf, "" if fuer_mail else NAVIGATION))
     if not fuer_mail:
         t.append(ALARMSCHALTER)
         t.append(AUFFRISCHEN)
 
     # ---- Barometer
     wert, lage = barometer
-    balken = barometer_verlauf_balken(barometer_verlauf)
     trend = ""
     if barometer_verlauf and len(barometer_verlauf) >= 2:
         vorher = barometer_verlauf[-2].get("wert")
@@ -3568,12 +3600,9 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
              '<div class="skala"><i style="left:calc(%d%% - 1px)"></i></div>'
              '<div class="klein">0 = Umfeld arbeitet gegen die Short-These, '
              '100 = dafuer. Verdichtet Relativstaerken, Volatilitaetsstruktur, '
-             'Kreditumfeld und die Nachrichtenbilanz.</div></div>%s</div>'
+             'Kreditumfeld und die Nachrichtenbilanz.</div></div></div>'
              % ("gut" if wert >= 56 else ("schlecht" if wert <= 44 else "neutral"),
-                wert, lage, trend, wert,
-                ('<div style="text-align:right"><div class="klein" '
-                 'style="margin-bottom:3px">Verlauf</div>%s</div>' % balken)
-                if balken else ""))
+                wert, lage, trend, wert))
 
     # ---- Hinweis auf eine laufende Stummschaltung
     if ruhe_aktiv(konfig):
