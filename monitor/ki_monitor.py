@@ -485,6 +485,52 @@ def modell_releases_text(konfig):
         for e in rel)
 
 
+def zirkel_und_abschreibung_text(konfig):
+    """
+    Die beiden Einordnungen, die keine Messwerte sind, sondern Urteile: wie die
+    Zirkelfinanzierung zu lesen ist und was die Nutzungsdauern bedeuten.
+
+    Beides steht bewusst als Text da und nicht als Zahl. Wer die
+    Zirkelfinanzierung auf einen Indikator verkuerzt, liest sie am Ende als
+    Bestaetigung, obwohl sie fuer die Vertiv-Seite das Gegenteil bedeutet.
+    """
+    k = konfig.get("kennzahlen") or {}
+    teile = []
+
+    z = k.get("zirkelfinanzierung") or {}
+    if z:
+        teile.append(
+            "ZIRKELFINANZIERUNG - wie sie zu lesen ist\n"
+            "  %s\n"
+            "  WAS ENTLASTET:\n%s\n"
+            "  WAS NICHT ENTLASTET:\n%s\n"
+            "  FUER DIE POSITION: %s\n"
+            "  VORSICHT: %s"
+            % (z.get("kernsatz", ""),
+               "\n".join("    - " + x for x in z.get("was_entlastet", [])),
+               "\n".join("    - " + x for x in z.get("was_nicht_entlastet", [])),
+               z.get("folgerung_fuer_die_position", ""),
+               z.get("vorsicht_berichterstattung", "")))
+
+    d = k.get("abschreibungsdauer") or {}
+    if d.get("unternehmen"):
+        teile.append(
+            "NUTZUNGSDAUER DER RECHENZENTRUMSHARDWARE (Stand %s)\n"
+            "%s\n"
+            "  %s\n"
+            "  EINSCHRAENKUNG: %s\n"
+            "  WORAUF ACHTEN: %s"
+            % (d.get("stand", "?"),
+               "\n".join("    %-10s %.1f Jahre  seit %s  %s%s"
+                          % (f.get("name", "?"), f.get("jahre", 0),
+                             f.get("seit", "?"), f.get("richtung", ""),
+                             "  (" + f["bemerkung"] + ")" if f.get("bemerkung") else "")
+                          for f in d["unternehmen"]),
+               d.get("warum_es_zaehlt", ""), d.get("einschraenkung", ""),
+               d.get("worauf_achten", "")))
+    return "\n\n".join(teile) or "  (nichts hinterlegt)"
+
+
 def kennzahlen_text(konfig):
     """
     Formt die hinterlegten Erwartungswerte als Text: den Analystenkonsens zum
@@ -1333,6 +1379,48 @@ def indikatoren_bauen(kurse, gruppen, zusatz=None):
                                wandel),
             })
 
+    # --- Nutzungsdauer der Rechenzentrumshardware
+    # Der Stand sagt wenig, die Richtung alles: Wer verkuerzt, gesteht
+    # schnellere Veralterung ein - und zwar aus erster Hand, mit Zugang zu den
+    # eigenen Ausfallraten. Das ist der Ausloeser, der aus einer
+    # Bilanzierungsdebatte ein Ereignis macht.
+    dauer = ((((zusatz or {}).get("konfig")) or {}).get("kennzahlen")
+             or {}).get("abschreibungsdauer") or {}
+    firmen = dauer.get("unternehmen") or []
+    if firmen:
+        werte = [f["jahre"] for f in firmen if f.get("jahre")]
+        verkuerzt = [f["name"] for f in firmen
+                     if (f.get("richtung") or "").upper().startswith("VERK")]
+        ind.append({
+            "name": "Unterstellte Nutzungsdauer",
+            "wert": sum(werte) / len(werte) if werte else 0,
+            "einheit": ("Jahre im Schnitt ueber %d Anbieter; %s"
+                        % (len(werte),
+                           "verkuerzt: " + ", ".join(verkuerzt) if verkuerzt
+                           else "keiner hat verkuerzt")),
+            "erklaerung": "Auf wie viele Jahre die Hyperscaler ihre "
+                          "Rechenzentrumshardware abschreiben. Eine Verlaengerung "
+                          "senkt den Abschreibungsaufwand und hebt den "
+                          "ausgewiesenen Gewinn, ohne dass sich etwas Reales "
+                          "aendert &ndash; zusammen rund 18 Mrd. USD im Jahr. "
+                          "<b>Entscheidend ist nicht der Stand, sondern eine "
+                          "Verkuerzung.</b> Wer verkuerzt, gesteht schnellere "
+                          "Veralterung ein, und zwar mit Blick auf die eigenen "
+                          "Ausfallraten. Amazon ist 2025 vorangegangen und hat "
+                          "das beschleunigte Tempo der Technik ausdruecklich als "
+                          "Grund genannt. <b>Folgt ein zweiter, ist das der "
+                          "Ausloeser</b>, der aus der Bilanzierungsdebatte ein "
+                          "Ereignis macht. <b>Betrifft die Hyperscaler, nicht "
+                          "Nvidia</b> &ndash; also mittelbar die Zahlungskraft "
+                          "derer, die den Capex tragen.",
+            # Zwei oder mehr Verkuerzungen sind ein Muster, eine ist ein Einzelfall.
+            "these": "gut" if len(verkuerzt) >= 2 else "neutral",
+            "nachkomma": 1,
+            "vergleichswert": len(verkuerzt),
+            "kurzwert": ("%d Anbieter haben verkuerzt" % len(verkuerzt)
+                         if verkuerzt else "keine Verkuerzung"),
+        })
+
     return ind
 
 
@@ -1975,6 +2063,9 @@ Schlagzeilen mit Stichworttreffern:
 Regierungsvorhaben:
 %s
 
+ZWEI EINORDNUNGEN, DIE KEINE MESSWERTE SIND
+%s
+
 ERWARTUNGSWERTE - die Messlatten, an denen Zahlen zu messen sind
 Eine Zahl ist nur gut oder schlecht im Verhaeltnis zur Erwartung. "Rekordumsatz"
 heisst nichts, wenn der Konsens hoeher lag.
@@ -2167,6 +2258,7 @@ Antworte NUR mit JSON in genau dieser Form, ohne Rahmen und ohne Vorrede:
             n["titel"][:150], n.get("quelle", ""))),
         zeilen(regierung, 8, lambda r: "  %s - %s (%s)" % (
             r["datum"], r["titel"][:150], r.get("behoerde", "")[:60])),
+        zirkel_und_abschreibung_text(konfig),
         kennzahlen_text(konfig),
         modell_releases_text(konfig),
         ((("\n".join("  Guete %3s  %-24s %-10s %s  %s USD Ausgabe%s"
@@ -3788,6 +3880,55 @@ def bericht_bauen(konfig, positionen, kurse, gruppen_ansicht, indikatoren,
                        if n.get("umstufung_grund") else ""),
                     html_schuetzen(", ".join(n["treffer"]))))
 
+    # ---- Zwei Einordnungen, die keine Messwerte sind
+    kz0 = konfig.get("kennzahlen") or {}
+    z = kz0.get("zirkelfinanzierung") or {}
+    d = kz0.get("abschreibungsdauer") or {}
+    if z or d:
+        t.append("<h2>Zwei Einordnungen</h2>")
+    if z:
+        t.append('<div class="karte"><b>%s</b>'
+                 '<div class="klein" style="margin:6px 0"><b>%s</b></div>'
+                 '<div class="klein"><b>Was entlastet:</b><ul class="liste">%s</ul>'
+                 '<b>Was nicht entlastet:</b><ul class="liste">%s</ul></div>'
+                 '<div class="klein" style="margin-top:6px"><b>F&uuml;r die '
+                 'Position:</b> %s</div>'
+                 '<div class="klein" style="margin-top:6px"><b>Vorsicht:</b> %s</div>'
+                 '</div>'
+                 % (html_schuetzen(z.get("bezeichnung", "")),
+                    html_schuetzen(z.get("kernsatz", "")),
+                    "".join("<li>%s</li>" % html_schuetzen(x)
+                            for x in z.get("was_entlastet", [])),
+                    "".join("<li>%s</li>" % html_schuetzen(x)
+                            for x in z.get("was_nicht_entlastet", [])),
+                    html_schuetzen(z.get("folgerung_fuer_die_position", "")),
+                    html_schuetzen(z.get("vorsicht_berichterstattung", ""))))
+    if d.get("unternehmen"):
+        t.append('<div class="karte"><b>%s</b>'
+                 '<div class="tabelle" style="margin-top:6px"><table>'
+                 '<tr><th>Anbieter</th><th class="z">Jahre</th><th>seit</th>'
+                 '<th>Richtung</th><th>Bemerkung</th></tr>'
+                 % html_schuetzen(d.get("bezeichnung", "")))
+        for f in d["unternehmen"]:
+            kurz = (f.get("richtung") or "").upper().startswith("VERK")
+            t.append('<tr%s><td>%s</td><td class="z"><b>%.1f</b></td><td>%s</td>'
+                     '<td%s>%s</td><td class="klein">%s</td></tr>'
+                     % (" style='background:rgba(120,200,140,.10)'" if kurz else "",
+                        html_schuetzen(f.get("name", "")), f.get("jahre", 0),
+                        html_schuetzen(f.get("seit", "")),
+                        " class='gut'" if kurz else "",
+                        html_schuetzen(f.get("richtung", "")),
+                        html_schuetzen(f.get("bemerkung", ""))))
+        t.append('</table></div>'
+                 '<div class="klein" style="margin-top:6px">%s</div>'
+                 '<div class="klein" style="margin-top:6px"><b>Einschr&auml;nkung:'
+                 '</b> %s</div>'
+                 '<div class="klein" style="margin-top:6px"><b>Worauf achten:</b> '
+                 '%s</div></div>'
+                 % (html_schuetzen(d.get("warum_es_zaehlt", "")),
+                    html_schuetzen(d.get("einschraenkung", "")),
+                    html_schuetzen(d.get("worauf_achten", ""))))
+
     # ---- Erwartungswerte: die Messlatten
     kz = konfig.get("kennzahlen") or {}
     if kz:
@@ -4284,6 +4425,8 @@ def alles_sammeln(konfig, mit_claude=True, vorheriges_barometer=None):
             "stand": reihe_ccc[-1][0],
         }
 
+    # Einige Indikatoren stuetzen sich auf hinterlegte Kennzahlen statt auf Kurse.
+    zusatz["konfig"] = konfig
     indikatoren = indikatoren_bauen(gute_kurse, gruppen, zusatz)
 
     gruppen_ansicht = []
